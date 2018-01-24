@@ -1,8 +1,57 @@
-#script (python)
+"""
+- Past Body:
 
-import sys
+  H :- p', B.
+  becomes
+  H :- p(t-1), B.
+
+- Future Head:
+
+  'p :- q', B.
+  becomes
+  __f_p(t+1) :- q(t-1), B.
+  #external p(t) : __f_p(t+1).
+  __f_p(t+1) :-     p(t). % only for disjunctions
+      p(t)   :- __f_p(t).
+
+  Note: needs chains if there are gaps
+        (actually doesn't because of the equivalences)
+
+- Future Body:
+
+  p :- 'q, B.
+  can be reduced to Past Head case
+  p' :- q, B, t >= 1.
+
+- Past Head:
+
+  Requires domain expansion and will not be supported
+  q  :- p.
+  p' :- B.
+
+  # p' :- B.
+  __e_p(t,1) :- B.
+  # q :- p.
+  __e_q(t,D) :- __e_p(t,D).
+
+  __e_p(t,D-1) :- __e_p(t+1,D), D >= 1.
+  __e_p(t,D+1) :- __e_p(t-1,D), D <= m.
+
+  p(T-D) :- __e_p(T,D), @undefined(p,T-D).
+  q(T-D) :- __e_q(T,D), @undefined(q,T-D).
+
+- Future Body in constraints:
+
+  simply reground at the boundary if a non-positive simple atom refers to the future!!!
+  once everything is in the past -> no problem!!!
+  #external 'q.
+
+  _f_p(t,1) :- p(t,1).
+
+  :- 'p, not 'q.
+"""
+
 import clingo
-import clingo.ast
 
 class Transformer:
     def visit_children(self, x, *args, **kwargs):
@@ -25,34 +74,46 @@ class Transformer:
             raise TypeError("unexpected type")
 
 class TermTransformer(Transformer):
-    def __init__(self, parameter, dynamic_atoms):
-        self.parameter     = parameter
-        self.dynamic_atoms = dynamic_atoms
+    """
+    Members:
+    parameter         -- time parameter to extend atoms with
+    future_predicates -- reference to the map of future predicates
+      It has type '(name, arity, disjunctive) -> shift' where shift
+      corresponds to the number of next operators and disjunctive
+      determines if the predicate occurred in a disjunction.
+    """
+    def __init__(self, parameter, future_predicates):
+        """
+        Parameters:
+        parameter         -- time parameter to extend atoms with
+        future_predicates -- reference to the map of future predicates
+        """
+        self.__parameter         = parameter
+        self.__future_predicates = future_predicates
 
     def __get_param(self, name, location, head):
         """
-        Strips previous operators (encoded as trailing primes on the atom name)
+        Strips previous and next operators from function names
         and returns the updated name plus the time arguments to append.
 
         For head atoms this also introduces a new name for the predicate, which
         is recorded in the list of atoms that have to be made redefinable. In
-        this case the name is prefixed with __dynamic_ and the predicate
-        receives an additional time argument indicating how far to look back.
-        Such dynamic atoms are recorded in a list of atoms.
+        this case the name is prefixed with __future_. Such dynamic predicates are
+        recorded in the future_predicates list.
 
         Arguments:
-        name     - the name of the predicate 
+        name     - the name of the predicate
                    (trailing primes denote previous operators)
         location - location for generated terms
         head     - wheather this is a head occurrence
 
         Example for body atoms:
 
-            p(X) :- q'(X)
+            p(X) :- 'q(X)
 
         becomes
 
-            p(X,t) :- q'(X,t-1)
+            p(X,t) :- q(X,t-1)
 
         Example for head atoms:
 
@@ -60,16 +121,18 @@ class TermTransformer(Transformer):
 
         becomes
 
-            __previous_p(X,2,t) :- q(X,t).
+            __future__p(X,2,t) :- q(X,t).
+
+        and future_predicates is extended with (p,1,False) -> 2
         """
         n = name.translate(None, '\'')
         primes = len(name) - len(n)
-        params = [clingo.ast.Symbol(location, self.parameter)]
+        params = [clingo.ast.Symbol(location, self.__parameter)]
         previous = None
         if primes > 0:
             if head:
                 n = "__previous_" + n
-                self.dynamic_atoms.add((n, primes, self.parameter))
+                self.dynamic_atoms.add((n, primes, self.__parameter))
                 params.insert(0, clingo.ast.Symbol(location, primes))
             params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Minus, params[-1], clingo.ast.Symbol(location, primes))
         return (n, params)
@@ -126,63 +189,3 @@ class ProgramTransformer(Transformer):
         sig.arity += 1
         return sig
 
-def get(val, default):
-    return val if val != None else default
-
-def on_model(model):
-    table = {}
-    for sym in model.symbols(shown=True):
-        if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
-            table.setdefault(sym.arguments[-1], []).append(clingo.Function(sym.name, sym.arguments[:-1]))
-    sys.stdout.write("Answer: {}\n".format(model.number))
-    for step, symbols in sorted(table.items()):
-        sys.stdout.write(" State {}:".format(step))
-        sig = None
-        for sym in sorted(symbols):
-            if (sym.name, len(sym.arguments)) != sig:
-                sys.stdout.write("\n ")
-                sig = (sym.name, len(sym.arguments))
-            sys.stdout.write(" {}".format(sym))
-        sys.stdout.write("\n".format(step))
-
-def imain(prg):
-    imin   = get(prg.get_const("imin"), clingo.Number(0))
-    imax   = prg.get_const("imax")
-    istop  = get(prg.get_const("istop"), clingo.String("SAT"))
-
-    step, ret = 0, None
-    while ((imax is None or step < imax.number) and
-           (step == 0 or step < imin.number or (
-              (istop.string == "SAT"     and not ret.satisfiable) or
-              (istop.string == "UNSAT"   and not ret.unsatisfiable) or
-              (istop.string == "UNKNOWN" and not ret.unknown)))):
-        parts = []
-        parts.append(("base", [step]))
-        parts.append(("static", [step]))
-        if step > 0:
-            prg.release_external(clingo.Function("finally", [step-1]))
-            parts.append(("dynamic", [step]))
-            prg.cleanup()
-        else:
-            parts.append(("initial", [0]))
-        prg.ground(parts)
-        prg.assign_external(clingo.Function("finally", [step]), True)
-        ret, step = prg.solve(on_model=on_model), step+1
-
-def main(prg):
-    with prg.builder() as b:
-        dynamic_atoms = set()
-        t = ProgramTransformer(clingo.Function("__t"), dynamic_atoms)
-        clingo.parse_program(
-            open("example3.lp").read(),
-            lambda stm: b.add(t.visit(stm)))
-        print dynamic_atoms
-    imain(prg)
-
-#end.
-
-#program initial(t).
-initially(t).
-
-#program static(t).
-#external finally(t).

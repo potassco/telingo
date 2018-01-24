@@ -1,6 +1,6 @@
 #program static.
 {a}.
-p' :- a.
+{b}.
 
 #program final.
 
