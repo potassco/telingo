@@ -53,7 +53,6 @@ class Application:
                 parts.append(("initial", [0]))
             prg.ground(parts)
             prg.assign_external(clingo.Function("finally", [step]), True)
-            ret, step = prg.solve(), step+1
             ret, step = prg.solve(on_model=self.__on_model), step+1
 
     def main(self, prg, files):
