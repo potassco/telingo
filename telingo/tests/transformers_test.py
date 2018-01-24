@@ -17,7 +17,22 @@ def transform(s, head=False):
     return str(t.visit(parse_term(s), head)), a
 
 class TestTermTransformer(unittest.TestCase):
-    def test_transform(self):
+    def test_body(self):
         self.assertEqual(transform("p"), ("p(t)", {}))
         self.assertEqual(transform("p'p"), ("p'p(t)", {}))
-        self.assertEqual(transform("'p"), ("p((t-1))", {}))
+        self.assertEqual(transform("'p"), ("p((t+-1))", {}))
+        self.assertEqual(transform("''p"), ("p((t+-2))", {}))
+        self.assertEqual(transform("p'"), ("p((t+1))", {}))
+        self.assertEqual(transform("p''"), ("p((t+2))", {}))
+        self.assertEqual(transform("'p''"), ("p((t+1))", {}))
+        self.assertEqual(transform("''p'"), ("p((t+-1))", {}))
+
+    def test_head(self):
+        self.assertEqual(transform("p", True), ("p(t)", {}))
+        self.assertEqual(transform("p'p", True), ("p'p(t)", {}))
+        self.assertEqual(transform("'p", True), ("p((t+-1))", {}))
+        self.assertEqual(transform("''p", True), ("p((t+-2))", {}))
+        self.assertEqual(transform("p'", True), ("__future_p((t+1))", {}))
+        self.assertEqual(transform("p''", True), ("p((t+2))", {}))
+        self.assertEqual(transform("'p''", True), ("p((t+1))", {}))
+        self.assertEqual(transform("''p'", True), ("p((t+-1))", {}))

@@ -124,17 +124,25 @@ class TermTransformer(Transformer):
             __future__p(X,2,t) :- q(X,t).
 
         and future_predicates is extended with (p,1,False) -> 2
+
+        TODO: should become more agruments to control how primes are handled
         """
-        n = name.translate(None, '\'')
-        primes = len(name) - len(n)
+        n = name.strip("'")
+        shift = 0
+        for c in name:
+            if c == "'":
+                shift -= 1
+            else:
+                break
+        shift += len(name) - len(n) + shift
+
         params = [clingo.ast.Symbol(location, self.__parameter)]
-        previous = None
-        if primes > 0:
-            if head:
-                n = "__previous_" + n
-                self.dynamic_atoms.add((n, primes, self.__parameter))
-                params.insert(0, clingo.ast.Symbol(location, primes))
-            params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Minus, params[-1], clingo.ast.Symbol(location, primes))
+        if shift != 0:
+            if head and shift > 0:
+                n = "__future_" + n
+                #self.dynamic_atoms.add((n, primes, self.__parameter))
+                params.insert(0, clingo.ast.Symbol(location, shift))
+            params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Plus, params[-1], clingo.ast.Symbol(location, shift))
         return (n, params)
 
     def visit_Function(self, term, head):
