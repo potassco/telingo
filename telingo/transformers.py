@@ -181,13 +181,22 @@ class TermTransformer(Transformer):
         return (n, params)
 
     def visit_Function(self, term, *args, **kwargs):
+        """
+        Transforms the given term.
+
+        See __get_param for more information.
+        """
         term.name, params = self.__get_param(term.name, len(term.arguments), term.location, *args, **kwargs)
         term.arguments.extend(params)
         return term
 
     def visit_Symbol(self, term, *args, **kwargs):
-        # this function is not necessary if gringo's parser is used
-        # but this case could occur in a valid AST
+        """
+        Raises a runtime error.
+
+        This function is not necessary if gringo's parser is used but this case
+        could occur in a valid AST.
+        """
         raise RuntimeError("not implemented")
 
 class ProgramTransformer(Transformer):
