@@ -122,7 +122,7 @@ class TermTransformer(Transformer):
         self.__parameter         = parameter
         self.__future_predicates = future_predicates
 
-    def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, disjunctive):
+    def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, disjunctive, max_shift):
         """
         Strips previous and next operators from function names
         and returns the updated name plus the time arguments to append.
@@ -139,6 +139,8 @@ class TermTransformer(Transformer):
         replace_future -- wheather this is a head occurrence
         fail_future    -- fail if the atom refers to the future
         fail_past      -- fail if the atom refers to the past
+        max_shift      -- the maximum number of steps terms look into the
+                          future
 
         Example for body atoms:
 
@@ -173,10 +175,13 @@ class TermTransformer(Transformer):
                 raise RuntimeError("future atoms not supported in this context: {}".format(location))
             if fail_past and shift < 0:
                 raise RuntimeError("past atoms not supported in this context: {}".format(location))
-            if replace_future and shift > 0:
-                n = "__future_" + n
-                self.__future_predicates.setdefault((n, arity, disjunctive), []).append(shift)
-                params.insert(0, clingo.ast.Symbol(location, shift))
+            if shift > 0:
+                if replace_future:
+                    n = "__future_" + n
+                    self.__future_predicates.setdefault((n, arity, disjunctive), []).append(shift)
+                    params.insert(0, clingo.ast.Symbol(location, shift))
+                else:
+                    max_shift[0] = max(max_shift[0], shift)
             params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Plus, params[-1], clingo.ast.Symbol(location, shift))
         return (n, params)
 
@@ -200,44 +205,89 @@ class TermTransformer(Transformer):
         raise RuntimeError("not implemented")
 
 class ProgramTransformer(Transformer):
-    def __init__(self, parameter, dynamic_atoms):
-        self.final = False
-        self.head = False
-        self.parameter = parameter
-        self.term_transformer = TermTransformer(parameter, dynamic_atoms)
+    """
+    Members:
+    __final            -- Final rules are put into the static program part and
+                          the __final atom put into their body. This flag
+                          indicates that the __final atom has to be appended.
+    __head             -- Indicates that the head of a rule is being visited.
+    __constraint       -- Whether the current statement is a constraint.
+    __disjunction      -- Wether the current statement is a disjunction.
+    __max_shift        -- The maximum number of steps a rule looks into the
+                          future. Determines window to reground constraints.
+                          Stored as a list with one integer element to allow
+                          passing by reference.
+    __parameter        -- The time parameter appended to atoms.
+    __term_transformer -- The transformer used to rewrite terms.
+    """
+    def __init__(self, parameter, future_predicates):
+        self.__final = False
+        self.__head = False
+        self.__constraint = False
+        self.__disjunction = False
+        self.__max_shift = [0]
+        self.__parameter = parameter
+        self.__term_transformer = TermTransformer(parameter, future_predicates)
 
     def visit(self, x, *args, **kwargs):
         ret = Transformer.visit(self, x, *args, **kwargs)
-        if self.final and isinstance(x, clingo.ast.AST) and hasattr(x, "body"):
+        if self.__final and isinstance(x, clingo.ast.AST) and hasattr(x, "body"):
             loc = x.location
-            x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "finally", [clingo.ast.Symbol(loc, self.parameter)], False))));
+            x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, self.__parameter)], False))));
         return ret
 
     def visit_Rule(self, rule):
         try:
-            self.head = True
+            """
+            TODO: This is not yet working in all cases. Conditions and negative
+            literals should not be considered head atoms.
+            """
+            self.__head = True
             self.visit(rule.head)
         finally:
-            self.head = False
+            self.__head = False
         self.visit(rule.body)
         return rule
 
     def visit_SymbolicAtom(self, atom):
-        atom.term = self.term_transformer.visit(atom.term, self.head)
+        """
+        Rewrites the given symbolic atom appending a time parameter.
+
+        If this atom appears in a head then it is also replaced by a
+        corresponding future atom defined later.
+        """
+        atom.term = self.__term_transformer.visit(atom.term, self.__head, not self.__head and not self.__constraint, self.__head, self.__head and self.__disjunction, self.__max_shift)
         return atom
 
     def visit_Program(self, prg):
-        self.final = prg.name == "final"
-        if self.final:
+        """
+        Adds the time parameter to the given program given directive.
+
+        Furthermore, the final program part is turned into a static program
+        part and the __final flag set accordingly.
+        """
+        self.__final = prg.name == "final"
+        if self.__final:
             prg.name = "static"
-        prg.parameters.append(clingo.ast.Id(prg.location, self.parameter.name))
+        prg.parameters.append(clingo.ast.Id(prg.location, self.__parameter.name))
         return prg
 
     def visit_ShowSignature(self, sig):
+        """
+        Adjusts the arity of show predicate statements.
+
+        For example `#show p/2` becomes `#show p/3` because all occurrences of
+        atoms over `p` are extended with a time parameter.
+        """
         sig.arity += 1
         return sig
 
     def visit_ProjectSignature(self, sig):
+        """
+        Adjusts the arity of project predicate statements.
+
+        See visit_ShowSignature.
+        """
         sig.arity += 1
         return sig
 
