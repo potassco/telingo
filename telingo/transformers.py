@@ -54,12 +54,38 @@
 import clingo
 
 class Transformer:
+    """
+    Basic visitor to traverse and modify an AST.
+
+    Transformers to modify an AST should subclass this class and add visit_TYPE
+    methods where TYPE corresponds to an ASTType. This function is called
+    whenever a node of the respective type is visited. Its return value will
+    replace the node in the parent.
+
+    Function visit should be called on the root of the AST to be visited. It is
+    the users responsibility to visit children of nodes that have node-specific
+    visitor.
+    """
     def visit_children(self, x, *args, **kwargs):
+        """
+        Visits and transforms the children of the given node.
+        """
         for key in x.child_keys:
             setattr(x, key, self.visit(getattr(x, key), *args, **kwargs))
         return x
 
     def visit(self, x, *args, **kwargs):
+        """
+        Visits the given node and returns its transformation.
+
+        If there is a matching visit_TYPE function where TYPE corresponds to
+        the ASTType of the given node then this function called and its value
+        returned. Otherwise, its children are visited and transformed.
+
+        This function accepts additional positional and keyword arguments,
+        which are passed to node-specific visit functions and to the visit
+        function called for child nodes.
+        """
         if isinstance(x, clingo.ast.AST):
             attr = "visit_" + str(x.type)
             if hasattr(self, attr):
@@ -75,6 +101,10 @@ class Transformer:
 
 class TermTransformer(Transformer):
     """
+    This class traverses the AST of a term until a Function is found. It then
+    add a time parameter to its argument and optionally rewrites the and
+    records the predicate name.
+
     Members:
     parameter         -- time parameter to extend atoms with
     future_predicates -- reference to the map of future predicates
