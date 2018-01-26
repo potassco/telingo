@@ -1,4 +1,9 @@
 """
+This module is responsible for visiting and rewriting a programs AST to account
+for temporal operators.
+
+The following are random notes sketched before writing the code in this module:
+
 - Past Body:
 
   H :- p', B.
@@ -107,12 +112,12 @@ class TermTransformer(Transformer):
     records the predicate name.
 
     Members:
-    parameter         -- time parameter to extend atoms with
-    future_predicates -- reference to the map of future predicates
+    parameter         -- Time parameter to extend atoms with.
+    future_predicates -- Reference to the map of future predicates
                          having type '(name, arity, disjunctive) -> shift'
                          where shift corresponds to the number of next
                          operators and disjunctive determines if the predicate
-                         occurred in a disjunction
+                         occurred in a disjunction.
     """
     def __init__(self, parameter, future_predicates):
         """
@@ -134,14 +139,15 @@ class TermTransformer(Transformer):
         dynamic predicates are recorded in the future_predicates list.
 
         Arguments:
-        name           -- the name of the predicate
-                          (trailing primes denote previous operators)
-        location       -- location for generated terms
-        replace_future -- wheather this is a head occurrence
-        fail_future    -- fail if the atom refers to the future
-        fail_past      -- fail if the atom refers to the past
-        max_shift      -- the maximum number of steps terms look into the
-                          future
+        name           -- The name of the predicate
+                          (trailing primes denote previous operators).
+        location       -- Location for generated terms.
+        replace_future -- Whether atoms referring to the future have to be
+                          replaced by a special future atom.
+        fail_future    -- Fail if the atom refers to the future.
+        fail_past      -- Fail if the atom refers to the past.
+        max_shift      -- The maximum number of steps terms look into the
+                          future.
 
         Example for body atoms:
 
@@ -226,6 +232,10 @@ def is_disjunction(s):
 
 class ProgramTransformer(Transformer):
     """
+    Rewrites all temporal operators in a logic program.
+
+    Statements should be passed one after the other to the visit method.
+
     Members:
     __final            -- Final rules are put into the static program part and
                           the __final atom put into their body. This flag
@@ -239,8 +249,10 @@ class ProgramTransformer(Transformer):
                           passing by reference.
     __parameter        -- The time parameter appended to atoms.
     __term_transformer -- The transformer used to rewrite terms.
+    __constraint_parts -- Parts that have to be regrounded because of
+                          constraints referring to the future.
     """
-    def __init__(self, parameter, future_predicates):
+    def __init__(self, parameter, future_predicates, constraint_parts):
         self.__final = False
         self.__head = False
         self.__constraint = False
@@ -248,36 +260,46 @@ class ProgramTransformer(Transformer):
         self.__max_shift = [0]
         self.__parameter = parameter
         self.__term_transformer = TermTransformer(parameter, future_predicates)
+        self.__constraint_parts = constraint_parts
+
+    def __append_final(self, x, add_param=False):
+        loc = x.location
+        x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, self.__parameter)] if add_param else [], False))));
 
     def visit(self, x, *args, **kwargs):
         """
         Extends the transformer's generic visit method to add the final atom to
         all AST nodes in final program parts having a body.
 
-        The extension happens after the node is visited normally.
+        The extension happens before the node is visited normally so the time
+        parameter is added to the atom accordingly.
         """
-        #TODO: it might be a good idea to add the atom before translation
-        ret = Transformer.visit(self, x, *args, **kwargs)
         if self.__final and isinstance(x, clingo.ast.AST) and hasattr(x, "body"):
-            loc = x.location
-            x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, self.__parameter)], False))));
+            self.__append_final(x)
+        ret = Transformer.visit(self, x, *args, **kwargs)
         return ret
 
     def visit_Rule(self, rule):
+        """
+        Sets the state flags when visiting a rule.
+
+        After that the head and body of the rule are visited in the right context.
+        """
         try:
-            """
-            TODO: This is not yet working in all cases. Conditions and negative
-            literals should not be considered head atoms.
-            """
             self.__head = True
             self.__max_shift = [0]
             self.__constraint = is_constraint(rule)
             self.__disjunction = is_disjunction(rule)
-            self.visit(rule.head)
+            rule.head = self.visit(rule.head)
             self.__head = False
-            self.visit(rule.body)
+            rule.body = self.visit(rule.body)
+            if self.__max_shift[0] > 0 and not self.__final:
+                last = ast.Rule(rule.location, rule.head, rule.body[:])
+                self.__append_final(rule, True)
+                self.__constraint_parts.setdefault((self.__part, self.__parameter.name, self.__max_shift[0]), []).append((rule, last))
         finally:
             self.__head        = False
+            self.__max_shift   = [0]
             self.__constraint  = False
             self.__disjunction = False
         return rule
@@ -327,6 +349,7 @@ class ProgramTransformer(Transformer):
         if self.__final:
             prg.name = "static"
         prg.parameters.append(clingo.ast.Id(prg.location, self.__parameter.name))
+        self.__part = prg.name
         return prg
 
     def visit_ShowSignature(self, sig):
