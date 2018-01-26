@@ -80,37 +80,48 @@ class TestClassify(unittest.TestCase):
 class TestProgramTransformer(unittest.TestCase):
     def test_rule(self):
         # simple rules
-        self.assertEqual(transform_program("p."), (['#program base(t).', 'p(t).'], {}, {}))
-        self.assertEqual(transform_program("p :- 'p."), (['#program base(t).', 'p(t) :- p((t+-1)).'], {}, {}))
-        self.assertEqual(transform_program("p'."), (['#program base(t).', '__future_p(1,(t+1)).'], {('__future_p', 0, False): [1]}, {}))
+        self.assertEqual(transform_program("p."), (['#program static(t).', 'p(t).'], {}, {}))
+        self.assertEqual(transform_program("p :- 'p."), (['#program static(t).', 'p(t) :- p((t+-1)).'], {}, {}))
+        self.assertEqual(transform_program("p'."), (['#program static(t).', '__future_p(1,(t+1)).'], {('__future_p', 0, False): [1]}, {}))
         self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "'p.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- p'.")
         # body aggregates
-        self.assertEqual(transform_program("p :- {'p:q}."), (['#program base(t).', 'p(t) :- { p((t+-1)) : q(t) }.'], {}, {}))
-        self.assertEqual(transform_program("p :- {p:'q}."), (['#program base(t).', 'p(t) :- { p(t) : q((t+-1)) }.'], {}, {}))
+        self.assertEqual(transform_program("p :- {'p:q}."), (['#program static(t).', 'p(t) :- { p((t+-1)) : q(t) }.'], {}, {}))
+        self.assertEqual(transform_program("p :- {p:'q}."), (['#program static(t).', 'p(t) :- { p(t) : q((t+-1)) }.'], {}, {}))
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p : q'}.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p' : q}.")
         # head aggregates
-        self.assertEqual(transform_program("{p' : 'q}."), (['#program base(t).', '{ __future_p(1,(t+1)) : q((t+-1)) }.'], {('__future_p', 0, False): [1]}, {}))
-        self.assertEqual(transform_program("{not 'p : 'q}."), (['#program base(t).', '{ not p((t+-1)) : q((t+-1)) }.'], {}, {}))
+        self.assertEqual(transform_program("{p' : 'q}."), (['#program static(t).', '{ __future_p(1,(t+1)) : q((t+-1)) }.'], {('__future_p', 0, False): [1]}, {}))
+        self.assertEqual(transform_program("{not 'p : 'q}."), (['#program static(t).', '{ not p((t+-1)) : q((t+-1)) }.'], {}, {}))
         self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "{'p : q}.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "{p : q'}.")
 
     def test_constraint(self):
         # simple rules
-        self.assertEqual(transform_program(":- p."), (['#program base(t).', '#false :- p(t).'], {}, {}))
-        self.assertEqual(transform_program(":- 'p."), (['#program base(t).', '#false :- p((t+-1)).'], {}, {}))
-        self.assertEqual(transform_program(":- p'."), (['#program base(t).', '#false :- p((t+1)); __final(t).'], {}, {('base', 't', 1): [('#false :- p((t+1)); __final(t).', '#false :- p((t+1)).')]}))
+        self.assertEqual(transform_program(":- p."), (['#program static(t).', '#false :- p(t).'], {}, {}))
+        self.assertEqual(transform_program(":- 'p."), (['#program static(t).', '#false :- p((t+-1)).'], {}, {}))
+        self.assertEqual(transform_program(":- p'."), (
+            ['#program static(t).', '#false :- p((t+1)); __final(t).'], {},
+            {('static', 't', 1): [('#false :- p((t+1)); __final(t).', '#false :- p((t+1)).')]}))
         self.assertEqual(transform_program("not p :- p'."), (
-            ['#program base(t).', 'not p(t) :- p((t+1)); __final(t).'], {},
-            {('base', 't', 1): [('not p(t) :- p((t+1)); __final(t).', 'not p(t) :- p((t+1)).')]}))
+            ['#program static(t).', 'not p(t) :- p((t+1)); __final(t).'], {},
+            {('static', 't', 1): [('not p(t) :- p((t+1)); __final(t).', 'not p(t) :- p((t+1)).')]}))
         self.assertEqual(transform_program("not 'p :- p'."), (
-            ['#program base(t).', 'not p((t+-1)) :- p((t+1)); __final(t).'], {},
-            {('base', 't', 1): [('not p((t+-1)) :- p((t+1)); __final(t).', 'not p((t+-1)) :- p((t+1)).')]}))
+            ['#program static(t).', 'not p((t+-1)) :- p((t+1)); __final(t).'], {},
+            {('static', 't', 1): [('not p((t+-1)) :- p((t+1)); __final(t).', 'not p((t+-1)) :- p((t+1)).')]}))
         self.assertEqual(transform_program("not p' :- p'."), (
-            ['#program base(t).', 'not p((t+1)) :- p((t+1)); __final(t).'], {},
-            {('base', 't', 1): [('not p((t+1)) :- p((t+1)); __final(t).', 'not p((t+1)) :- p((t+1)).')]}))
+            ['#program static(t).', 'not p((t+1)) :- p((t+1)); __final(t).'], {},
+            {('static', 't', 1): [('not p((t+1)) :- p((t+1)); __final(t).', 'not p((t+1)) :- p((t+1)).')]}))
         # body aggregates
         self.assertEqual(transform_program(":- {p':q'}."), (
-            ['#program base(t).', '#false :- { p((t+1)) : q((t+1)) }; __final(t).'], {},
-            {('base', 't', 1): [('#false :- { p((t+1)) : q((t+1)) }; __final(t).', '#false :- { p((t+1)) : q((t+1)) }.')]}))
+            ['#program static(t).', '#false :- { p((t+1)) : q((t+1)) }; __final(t).'], {},
+            {('static', 't', 1): [('#false :- { p((t+1)) : q((t+1)) }; __final(t).', '#false :- { p((t+1)) : q((t+1)) }.')]}))
+
+def transform(p):
+    r, f, c = transformers.transform([p])
+    return [str(s) for s in r], f, c
+
+class TestTransform(unittest.TestCase):
+    def test_transform(self):
+        self.assertEqual(transform("p."), (['#program static(__t).', 'p(__t).'], [], []))
+

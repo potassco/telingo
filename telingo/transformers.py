@@ -348,6 +348,8 @@ class ProgramTransformer(Transformer):
         self.__final = prg.name == "final"
         if self.__final:
             prg.name = "static"
+        if prg.name == "base":
+            prg.name = "static"
         prg.parameters.append(clingo.ast.Id(prg.location, self.__parameter.name))
         self.__part = prg.name
         return prg
@@ -370,4 +372,26 @@ class ProgramTransformer(Transformer):
         """
         sig.arity += 1
         return sig
+
+def transform(inputs):
+    """
+    TODO: unfinished
+
+    future parts and constraint parts have to be added to the program
+
+    - should return the signatures of predicates that have to be set to false
+    - should return the signatures of the constraint parts that have to be grounded differently
+
+    """
+    future_predicates = {}
+    constraint_parts  = {}
+    ret               = []
+    transformer = ProgramTransformer(clingo.Function("__t"), future_predicates, constraint_parts)
+    for i in inputs:
+        clingo.parse_program(i, lambda s: ret.append(transformer.visit(s)))
+    assert(len(constraint_parts) == 0)
+    # TODO: add (static/dynamic/initial rules for those)
+    assert(len(future_predicates) == 0)
+    # TODO: add (static rules for those)
+    return ret, [], []
 
