@@ -52,6 +52,7 @@
 """
 
 import clingo
+import clingo.ast as ast
 
 class Transformer:
     """
@@ -204,6 +205,25 @@ class TermTransformer(Transformer):
         """
         raise RuntimeError("not implemented")
 
+def is_constraint(s):
+    """
+    Check if the given AST node is a constraint.
+
+    As a special case this function also considers rules with a negative
+    literal in the head as a disjunction.
+    """
+    return (s.type == ast.ASTType.Rule and s.head.type == ast.ASTType.Literal and
+            ((s.head.atom.type == ast.ASTType.BooleanConstant and not s.head.atom.value) or
+             (s.head.sign != ast.Sign.NoSign)))
+
+def is_disjunction(s):
+    """
+    Check if a given AST node is a disjunction.
+
+    Normal rules and constraints are not conisdered disjunctions.
+    """
+    return (s.type == ast.ASTType.Rule and s.head.type == ast.ASTType.Disjunction)
+
 class ProgramTransformer(Transformer):
     """
     Members:
@@ -230,6 +250,13 @@ class ProgramTransformer(Transformer):
         self.__term_transformer = TermTransformer(parameter, future_predicates)
 
     def visit(self, x, *args, **kwargs):
+        """
+        Extends the transformer's generic visit method to add the final atom to
+        all AST nodes in final program parts having a body.
+
+        The extension happens after the node is visited normally.
+        """
+        #TODO: it might be a good idea to add the atom before translation
         ret = Transformer.visit(self, x, *args, **kwargs)
         if self.__final and isinstance(x, clingo.ast.AST) and hasattr(x, "body"):
             loc = x.location
@@ -243,11 +270,41 @@ class ProgramTransformer(Transformer):
             literals should not be considered head atoms.
             """
             self.__head = True
+            self.__max_shift = [0]
+            self.__constraint = is_constraint(rule)
+            self.__disjunction = is_disjunction(rule)
             self.visit(rule.head)
-        finally:
             self.__head = False
-        self.visit(rule.body)
+            self.visit(rule.body)
+        finally:
+            self.__head        = False
+            self.__constraint  = False
+            self.__disjunction = False
         return rule
+
+    def visit_Literal(self, literal):
+        """
+        Removes the head flag for negative head literals.
+        """
+        head = self.__head
+        try:
+            self.__head = self.__head and literal.sign == ast.Sign.NoSign
+            return self.visit_children(literal)
+        finally:
+            self.__head = head
+
+    def visit_ConditionalLiteral(self, literal):
+        """
+        Make sure that conditions are traversed as non-head literals.
+        """
+        self.visit(literal.literal)
+        head = self.__head
+        try:
+            self.__head = False
+            self.visit(literal.condition)
+        finally:
+            self.__head = head
+        return literal
 
     def visit_SymbolicAtom(self, atom):
         """

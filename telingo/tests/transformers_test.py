@@ -47,13 +47,62 @@ class TestTermTransformer(unittest.TestCase):
     def test_pool(self):
         self.assertEqual(transform_term("p'(1;2,3)"), ("(p(1,(t+1));p(2,3,(t+1)))", {}, 1))
 
+def parse_rule(r):
+    ret = []
+    clingo.parse_program(r, lambda s: ret.append(s))
+    return ret[-1]
+
 def transform_program(p):
     a = {}
     ret = []
     t = transformers.ProgramTransformer(clingo.Function("t"), a)
     clingo.parse_program(p, lambda s: ret.append(str(t.visit(s))))
-    return ret
+    return (ret, a)
+
+class TestClassify(unittest.TestCase):
+    def test_constraint(self):
+        self.assertTrue(transformers.is_constraint(parse_rule(":-p.")))
+        self.assertTrue(transformers.is_constraint(parse_rule("#false :- p.")))
+        self.assertTrue(transformers.is_constraint(parse_rule("not q :- p.")))
+        self.assertTrue(transformers.is_constraint(parse_rule("not not q :- p.")))
+        self.assertFalse(transformers.is_constraint(parse_rule("p.")))
+        self.assertFalse(transformers.is_constraint(parse_rule("{p}.")))
+        self.assertFalse(transformers.is_constraint(parse_rule("a | b.")))
+        self.assertFalse(transformers.is_constraint(parse_rule("not a:#true.")))
+
+    def test_disjunction(self):
+        self.assertTrue(transformers.is_disjunction(parse_rule("a|b.")))
+        self.assertTrue(transformers.is_disjunction(parse_rule("a:#true.")))
+        self.assertFalse(transformers.is_disjunction(parse_rule("a.")))
+        self.assertFalse(transformers.is_disjunction(parse_rule(":-a.")))
 
 class TestProgramTransformer(unittest.TestCase):
     def test_rule(self):
-        self.assertEqual(transform_program("p."), ['#program base(t).', 'p(t).'])
+        # simple rules
+        self.assertEqual(transform_program("p."), (['#program base(t).', 'p(t).'], {}))
+        self.assertEqual(transform_program("p :- 'p."), (['#program base(t).', 'p(t) :- p((t+-1)).'], {}))
+        self.assertEqual(transform_program("p'."), (['#program base(t).', '__future_p(1,(t+1)).'], {('__future_p', 0, False): [1]}))
+        self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "'p.")
+        self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- p'.")
+        # body aggregates
+        self.assertEqual(transform_program("p :- {'p:q}."), (['#program base(t).', 'p(t) :- { p((t+-1)) : q(t) }.'], {}))
+        self.assertEqual(transform_program("p :- {p:'q}."), (['#program base(t).', 'p(t) :- { p(t) : q((t+-1)) }.'], {}))
+        self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p : q'}.")
+        self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p' : q}.")
+        # head aggregates
+        self.assertEqual(transform_program("{p' : 'q}."), (['#program base(t).', '{ __future_p(1,(t+1)) : q((t+-1)) }.'], {('__future_p', 0, False): [1]}))
+        self.assertEqual(transform_program("{not 'p : 'q}."), (['#program base(t).', '{ not p((t+-1)) : q((t+-1)) }.'], {}))
+        self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "{'p : q}.")
+        self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "{p : q'}.")
+
+    # TODO: this still requires some auxiliary stuff
+    def test_constraint(self):
+        # simple rules
+        self.assertEqual(transform_program(":- p."), (['#program base(t).', '#false :- p(t).'], {}))
+        self.assertEqual(transform_program(":- 'p."), (['#program base(t).', '#false :- p((t+-1)).'], {}))
+        self.assertEqual(transform_program(":- p'."), (['#program base(t).', '#false :- p((t+1)).'], {}))
+        self.assertEqual(transform_program("not p :- p'."), (['#program base(t).', 'not p(t) :- p((t+1)).'], {}))
+        self.assertEqual(transform_program("not 'p :- p'."), (['#program base(t).', 'not p((t+-1)) :- p((t+1)).'], {}))
+        self.assertEqual(transform_program("not p' :- p'."), (['#program base(t).', 'not p((t+1)) :- p((t+1)).'], {}))
+        # body aggregates
+        self.assertEqual(transform_program(":- {p':q'}."), (['#program base(t).', '#false :- { p((t+1)) : q((t+1)) }.'], {}))
