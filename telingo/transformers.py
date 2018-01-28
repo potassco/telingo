@@ -410,6 +410,8 @@ def transform(inputs, callback):
                          'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
     future_predicates = {}
     constraint_parts  = {}
+    time              = ast.Symbol(loc, clingo.Function(_time_parameter_name))
+    wrap_lit          = lambda a: ast.Literal(loc, ast.Sign.NoSign, a)
 
     # apply transformer to program
     def append(s):
@@ -425,18 +427,16 @@ def transform(inputs, callback):
         callback(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name)]))
         for (name, arity, shift), disjunctive in future_predicates.items():
             variables = [ "{}{}".format(_variable_prefix, i) for i in range(arity) ]
-            t = ast.Symbol(loc, clingo.Function(_time_parameter_name))
             s = ast.Symbol(loc, clingo.Number(shift))
-            l = lambda x: ast.Literal(loc, ast.Sign.NoSign, x)
-            t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, t, s)
-            p_current = ast.SymbolicAtom(ast.Function(loc, name, variables + [t], False))
-            f_current =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t], False))
+            t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, time, s)
+            p_current = ast.SymbolicAtom(ast.Function(loc, name, variables + [time], False))
+            f_current =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, time], False))
             if disjunctive:
                 p_future = ast.SymbolicAtom(ast.Function(loc, name, variables + [t_shifted], False))
                 f_future =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t_shifted], False))
-                callback(ast.External(loc, p_future, [l(f_future)]))
-                callback(ast.Rule(loc, l(f_future), [l(p_future)]))
-            callback(ast.Rule(loc, l(p_current), [l(f_current)]))
+                callback(ast.External(loc, p_future, [wrap_lit(f_future)]))
+                callback(ast.Rule(loc, wrap_lit(f_future), [wrap_lit(p_future)]))
+            callback(ast.Rule(loc, wrap_lit(p_current), [wrap_lit(f_current)]))
             future_sigs.append((_future_prefix + name, arity + 2))
 
     # gather rules for constraints referring to the future
@@ -457,6 +457,18 @@ def transform(inputs, callback):
             for p, l in rules:
                 callback(l)
             reground_parts.append((name, last_part, range(shift, shift+1)))
+
+    def add_part(part_name, atom_name, statement, wrap=lambda x: x):
+        params = [ast.Id(loc, _time_parameter_name)]
+        callback(ast.Program(loc, part_name, params))
+        atom = wrap(ast.SymbolicAtom(ast.Function(loc, atom_name, [time], False)))
+        callback(statement(loc, atom, []))
+    add_part('initial', '__initial', ast.Rule, wrap_lit)
+    add_part('static', '__final', ast.External)
+
+    reground_parts.append(('static',  'static',  range(1)))
+    reground_parts.append(('dynamic', 'dynamic', range(1)))
+    reground_parts.append(('initial', 'initial', range(1)))
 
     return future_sigs, reground_parts
 

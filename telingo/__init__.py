@@ -1,19 +1,70 @@
 import sys
 import clingo
-import telingo.transformers as trans
-from textwrap import dedent
+import telingo.transformers as transformers
+
+def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
+    """
+    Take a program object and runs the incremental main solving loop.
+
+    Arguments:
+    prg           -- Control object holding the program.
+    future_sigs   -- Signatures of predicates whose future incarnations have to
+                     be set to False.
+    program_parts -- Program parts to ground.
+    imin          -- Minimum number of iterations.
+    imax          -- Maximum number of iterations.
+    istop         -- When to stop.
+
+    TODO: explain future_sigs and parts a bit more
+    """
+    step, ret = 0, None
+    while ((imax is None or step < imax) and
+           (step == 0 or step < imin or (
+              (istop == "SAT"     and not ret.satisfiable) or
+              (istop == "UNSAT"   and not ret.unsatisfiable) or
+              (istop == "UNKNOWN" and not ret.unknown)))):
+        parts = []
+        for root_name, part_name, rng in program_parts:
+            for i in rng:
+                if ((step - i >= 0 and root_name == "static") or
+                    (step - i  > 0 and root_name == "dynamic") or
+                    (step - i == 0 and root_name == "initial")):
+                    parts.append((part_name, [step - i]))
+        if step > 0:
+            prg.release_external(clingo.Function("__final", [step-1]))
+            prg.cleanup()
+
+        prg.ground(parts)
+        prg.assign_external(clingo.Function("__final", [step]), True)
+        assumptions = []
+        for name, arity in future_sigs:
+            for atom in prg.symbolic_atoms.by_signature(name, arity):
+                if atom.symbol.arguments[-1].number > step:
+                    assumptions.append(-atom.literal)
+        ret, step = prg.solve(on_model=on_model, assumptions=assumptions), step+1
 
 class Application:
-
+    """
+    TODO: document
+    """
     def __init__(self, name):
+        """
+        Initializes the application setting the program name.
+
+        See clingo.clingo_main().
+        """
         self.program_name = name
 
-    def __get(self, val, default):
-        return val if val != None else default
+    def __get(self, prg, name, attr, default):
+        """
+        TODO: Remove and handle --imin, --imax, and --istop using options.
+        """
+        val = prg.get_const(name)
+        return getattr(val, attr) if val is not None else default
 
     def __on_model(self, model):
         """
-        TODO: it would be nice to have some other mechanism to print models, e.g., pass an output thingy to the model
+        Prints the atoms in a model grouped by state.
         """
         table = {}
         for sym in model.symbols(shown=True):
@@ -31,47 +82,21 @@ class Application:
             sys.stdout.write("\n".format(step))
         return True
 
-    def __imain(self, prg):
-        imin   = self.__get(prg.get_const("imin"), clingo.Number(0))
-        imax   = prg.get_const("imax")
-        istop  = self.__get(prg.get_const("istop"), clingo.String("SAT"))
-
-        step, ret = 0, None
-        while ((imax is None or step < imax.number) and
-               (step == 0 or step < imin.number or (
-                  (istop.string == "SAT"     and not ret.satisfiable) or
-                  (istop.string == "UNSAT"   and not ret.unsatisfiable) or
-                  (istop.string == "UNKNOWN" and not ret.unknown)))):
-            parts = []
-            parts.append(("base", [step]))
-            parts.append(("static", [step]))
-            if step > 0:
-                prg.release_external(clingo.Function("finally", [step-1]))
-                parts.append(("dynamic", [step]))
-                prg.cleanup()
-            else:
-                parts.append(("initial", [0]))
-            prg.ground(parts)
-            prg.assign_external(clingo.Function("finally", [step]), True)
-            ret, step = prg.solve(on_model=self.__on_model), step+1
-
     def main(self, prg, files):
-        prg.add("base", [], dedent("""\
-            #program initial(t).
-            initially(t).
+        """
+        Implements the main control loop.
 
-            #program static(t).
-            #external finally(t).
-            """))
+        This function implements the Application.main() function as required by
+        clingo.clingo_main().
+        """
+        imin   = self.__get(prg, "imin", "number", 0)
+        imax   = self.__get(prg, "imax", "number", None)
+        istop  = self.__get(prg, "istop", "string", "SAT")
+
         with prg.builder() as b:
-            dynamic_atoms = set()
-            t = trans.ProgramTransformer(clingo.Function("__t"), dynamic_atoms)
-            for f in files:
-                clingo.parse_program(
-                    open(f).read(),
-                    lambda stm: b.add(t.visit(stm)))
+            files = [open(f) for f in files]
             if len(files) == 0:
-                clingo.parse_program(
-                    sys.stdin.read(),
-                    lambda stm: b.add(t.visit(stm)))
-        self.__imain(prg)
+                files.append(sys.stdin)
+            future_sigs, program_parts = transformers.transform([f.read() for f in files], b.add)
+
+        imain(prg, future_sigs, program_parts, self.__on_model, imin, imax, istop)

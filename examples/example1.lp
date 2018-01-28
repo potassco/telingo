@@ -4,8 +4,8 @@ q(0).
 
 #program dynamic.
 
-q(X+1) :- q'(X).
-r(X) :- r'(X).
+q(X+1) :- 'q(X).
+r(X) :- 'r(X).
 
 #program static.
 
