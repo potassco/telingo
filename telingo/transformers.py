@@ -384,7 +384,8 @@ def transform(inputs):
     regrounded if referring to the future.
     ...
     """
-    loc               = None
+    loc               = {'begin': {'line': 1, 'column': 1, 'filename': '<transform>'},
+                         'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
     future_predicates = {}
     constraint_parts  = {}
     ret               = []
