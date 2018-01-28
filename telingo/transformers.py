@@ -1,6 +1,52 @@
 """
 This module is responsible for visiting and rewriting a programs AST to account
 for temporal operators.
+
+Handling of normal atoms
+========================
+The temporal program
+
+  p :- q.
+
+becomes
+
+  p(t) :- q(t).
+
+Handling of past atoms in the body
+==================================
+The temporal program
+
+  p :- 'q.
+
+becomes
+
+  p(t) :- q(t-1).
+
+Handling of future atoms in the head
+====================================
+The temporal program
+
+  p'.
+
+referring to the future in a rule head is rewritten into the following ASP
+program:
+
+  f_p(1,t+1).
+
+with auxiliary rules
+
+  #program static(t).
+  #external p(t+1)   :   f_p(1,t+1). % only for disjunctions
+          f_p(1,t+1) :-    p(t+1).   % only for disjunctions
+            p(t)     :-  f_p(1,t).
+
+and future signatures [('f_p', 2)] whose atoms have to be set to False if
+referring to the future. Note that the first two auxiliary rules can be
+omitted if a future predicate does not occur in disjunctions.
+
+Handling of constraints referring to the future
+===============================================
+...
 """
 
 import clingo
@@ -336,29 +382,6 @@ def transform(inputs):
     Returns a list of rules, future predicates whose atoms  have to be set to
     false if referring to the future, and program parts that have to be
     regrounded if referring to the future.
-
-    Handling of future predicates:
-    The program
-
-      p'.
-
-    referring to the future in a rule head is rewritten in the following ASP
-    program:
-
-      f_p(1,t+1).
-
-    with auxiliary rules
-
-      #program static(t).
-      #external p(t+1)   :   f_p(1,t+1). % only for disjunctions
-              f_p(1,t+1) :-    p(t+1).   % only for disjunctions
-                p(t)     :-  f_p(1,t).
-
-    and future signatures [('f_p', 2)] whose atoms have to be set to False if
-    referring to the future. Note that the first two auxiliary rules can be
-    omitted if a future predicate does not occur in disjunctions.
-
-    Handling of constraints referring to the future:
     ...
     """
     loc               = None
