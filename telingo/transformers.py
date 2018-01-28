@@ -1,63 +1,14 @@
 """
 This module is responsible for visiting and rewriting a programs AST to account
 for temporal operators.
-
-The following are random notes sketched before writing the code in this module:
-
-- Past Body:
-
-  H :- p', B.
-  becomes
-  H :- p(t-1), B.
-
-- Future Head:
-
-  'p :- q', B.
-  becomes
-  __f_p(t+1) :- q(t-1), B.
-  #external p(t) : __f_p(t+1).
-  __f_p(t+1) :-     p(t). % only for disjunctions
-      p(t)   :- __f_p(t).
-
-  Note: needs chains if there are gaps
-        (actually doesn't because of the equivalences)
-
-- Future Body:
-
-  p :- 'q, B.
-  can be reduced to Past Head case
-  p' :- q, B, t >= 1.
-
-- Past Head:
-
-  Requires domain expansion and will not be supported
-  q  :- p.
-  p' :- B.
-
-  # p' :- B.
-  __e_p(t,1) :- B.
-  # q :- p.
-  __e_q(t,D) :- __e_p(t,D).
-
-  __e_p(t,D-1) :- __e_p(t+1,D), D >= 1.
-  __e_p(t,D+1) :- __e_p(t-1,D), D <= m.
-
-  p(T-D) :- __e_p(T,D), @undefined(p,T-D).
-  q(T-D) :- __e_q(T,D), @undefined(q,T-D).
-
-- Future Body in constraints:
-
-  simply reground at the boundary if a non-positive simple atom refers to the future!!!
-  once everything is in the past -> no problem!!!
-  #external 'q.
-
-  _f_p(t,1) :- p(t,1).
-
-  :- 'p, not 'q.
 """
 
 import clingo
 import clingo.ast as ast
+
+_future_prefix = "__future_"
+_variable_prefix = "X"
+_time_parameter_name = "__t"
 
 class Transformer:
     """
@@ -114,7 +65,7 @@ class TermTransformer(Transformer):
     Members:
     parameter         -- Time parameter to extend atoms with.
     future_predicates -- Reference to the map of future predicates
-                         having type '(name, arity, disjunctive) -> shift'
+                         having type '{(name, arity, shift) -> disjuntive}'
                          where shift corresponds to the number of next
                          operators and disjunctive determines if the predicate
                          occurred in a disjunction.
@@ -165,7 +116,7 @@ class TermTransformer(Transformer):
 
             __future__p(X,2,t) :- q(X,t).
 
-        and future_predicates is extended with (p,1,False) -> 2
+        and future_predicates is extended with (p,1,2) -> False
         """
         n = name.strip("'")
         shift = 0
@@ -184,8 +135,12 @@ class TermTransformer(Transformer):
                 raise RuntimeError("past atoms not supported in this context: {}".format(location))
             if shift > 0:
                 if replace_future:
-                    n = "__future_" + n
-                    self.__future_predicates.setdefault((n, arity, disjunctive), []).append(shift)
+                    key = (n, arity, shift)
+                    if disjunctive:
+                        self.__future_predicates[key] = True
+                    else:
+                        self.__future_predicates.setdefault(key, False)
+                    n = _future_prefix + n
                     params.insert(0, clingo.ast.Symbol(location, shift))
                 else:
                     max_shift[0] = max(max_shift[0], shift)
@@ -375,23 +330,83 @@ class ProgramTransformer(Transformer):
 
 def transform(inputs):
     """
-    TODO: unfinished
+    Transforms the given list of temporal programs in string form into ASP
+    rules.
 
-    future parts and constraint parts have to be added to the program
+    Returns a list of rules, future predicates whose atoms  have to be set to
+    false if referring to the future, and program parts that have to be
+    regrounded if referring to the future.
 
-    - should return the signatures of predicates that have to be set to false
-    - should return the signatures of the constraint parts that have to be grounded differently
+    Handling of future predicates:
+    The program
 
+      p'.
+
+    referring to the future in a rule head is rewritten in the following ASP
+    program:
+
+      f_p(1,t+1).
+
+    with auxiliary rules
+
+      #program static(t).
+      #external p(t+1)   :   f_p(1,t+1). % only for disjunctions
+              f_p(1,t+1) :-    p(t+1).   % only for disjunctions
+                p(t)     :-  f_p(1,t).
+
+    and future signatures [('f_p', 2)] whose atoms have to be set to False if
+    referring to the future. Note that the first two auxiliary rules can be
+    omitted if a future predicate does not occur in disjunctions.
+
+    Handling of constraints referring to the future:
+    ...
     """
+    loc               = None
     future_predicates = {}
     constraint_parts  = {}
     ret               = []
-    transformer = ProgramTransformer(clingo.Function("__t"), future_predicates, constraint_parts)
+
+    # apply transformer to program
+    transformer = ProgramTransformer(clingo.Function(_time_parameter_name), future_predicates, constraint_parts)
     for i in inputs:
         clingo.parse_program(i, lambda s: ret.append(transformer.visit(s)))
-    assert(len(constraint_parts) == 0)
-    # TODO: add (static/dynamic/initial rules for those)
-    assert(len(future_predicates) == 0)
-    # TODO: add (static rules for those)
-    return ret, [], []
+
+    # add auxiliary rules for future predicates
+    future_sigs = []
+    if len(future_predicates) > 0:
+        ret.append(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name)]))
+        for (name, arity, shift), disjunctive in future_predicates.items():
+            variables = [ "{}{}".format(_variable_prefix, i) for i in range(arity) ]
+            t = ast.Symbol(loc, clingo.Function(_time_parameter_name))
+            s = ast.Symbol(loc, clingo.Number(shift))
+            l = lambda x: ast.Literal(loc, ast.Sign.NoSign, x)
+            t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, t, s)
+            p_current = ast.SymbolicAtom(ast.Function(loc, name, variables + [t], False))
+            f_current =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t], False))
+            if disjunctive:
+                p_future = ast.SymbolicAtom(ast.Function(loc, name, variables + [t_shifted], False))
+                f_future =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t_shifted], False))
+                ret.append(ast.External(loc, p_future, [l(f_future)]))
+                ret.append(ast.Rule(loc, l(f_future), [l(p_future)]))
+            ret.append(ast.Rule(loc, l(p_current), [l(f_current)]))
+            future_sigs.append((_future_prefix + name, arity + 2))
+
+    # gather rules for constraints referring to the future
+    reground_parts = []
+    if len(reground_parts) > 0:
+        # TODO: ...
+        assert(False)
+        '''
+        - Future Body in constraints:
+
+          simply reground at the boundary if a non-positive simple atom refers to the future!!!
+          once everything is in the past -> no problem!!!
+          #external 'q.
+
+          _f_p(t,1) :- p(t,1).
+
+          :- 'p, not 'q.
+        '''
+
+    return ret, future_sigs, reground_parts
 

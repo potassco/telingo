@@ -3,6 +3,9 @@ import clingo
 import clingo.ast as ast
 import telingo.transformers as transformers
 
+transformers._future_prefix = "f_"
+transformers._time_parameter_name = "t"
+
 def parse_term(t):
     ret = [None]
     def extract_term(s):
@@ -34,11 +37,11 @@ class TestTermTransformer(unittest.TestCase):
         self.assertEqual(transform_term("p'p", True), ("p'p(t)", {}, 0))
         self.assertEqual(transform_term("'p", True), ("p((t+-1))", {}, 0))
         self.assertEqual(transform_term("''p", True), ("p((t+-2))", {}, 0))
-        self.assertEqual(transform_term("p'", True), ("__future_p(1,(t+1))", {('__future_p', 0, False): [1]}, 0))
-        self.assertEqual(transform_term("p''", True), ("__future_p(2,(t+2))", {('__future_p', 0, False): [2]}, 0))
-        self.assertEqual(transform_term("'p''", True), ("__future_p(1,(t+1))", {('__future_p', 0, False): [1]}, 0))
+        self.assertEqual(transform_term("p'", True), ("f_p(1,(t+1))", {('p', 0, 1): False}, 0))
+        self.assertEqual(transform_term("p''", True), ("f_p(2,(t+2))", {('p', 0, 2): False}, 0))
+        self.assertEqual(transform_term("'p''", True), ("f_p(1,(t+1))", {('p', 0, 1): False}, 0))
         self.assertEqual(transform_term("''p'", True), ("p((t+-1))", {}, 0))
-        self.assertEqual(transform_term("p'(X,Y)", True), ("__future_p(X,Y,1,(t+1))", {('__future_p', 2, False): [1]}, 0))
+        self.assertEqual(transform_term("p'(X,Y)", True), ("f_p(X,Y,1,(t+1))", {('p', 2, 1): False}, 0))
 
     def test_fail(self):
         self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_term, "'p", fail_past=True)
@@ -82,7 +85,7 @@ class TestProgramTransformer(unittest.TestCase):
         # simple rules
         self.assertEqual(transform_program("p."), (['#program static(t).', 'p(t).'], {}, {}))
         self.assertEqual(transform_program("p :- 'p."), (['#program static(t).', 'p(t) :- p((t+-1)).'], {}, {}))
-        self.assertEqual(transform_program("p'."), (['#program static(t).', '__future_p(1,(t+1)).'], {('__future_p', 0, False): [1]}, {}))
+        self.assertEqual(transform_program("p'."), (['#program static(t).', 'f_p(1,(t+1)).'], {('p', 0, 1): False}, {}))
         self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "'p.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- p'.")
         # body aggregates
@@ -91,7 +94,7 @@ class TestProgramTransformer(unittest.TestCase):
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p : q'}.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "p :- {p' : q}.")
         # head aggregates
-        self.assertEqual(transform_program("{p' : 'q}."), (['#program static(t).', '{ __future_p(1,(t+1)) : q((t+-1)) }.'], {('__future_p', 0, False): [1]}, {}))
+        self.assertEqual(transform_program("{p' : 'q}."), (['#program static(t).', '{ f_p(1,(t+1)) : q((t+-1)) }.'], {('p', 0, 1): False}, {}))
         self.assertEqual(transform_program("{not 'p : 'q}."), (['#program static(t).', '{ not p((t+-1)) : q((t+-1)) }.'], {}, {}))
         self.assertRaisesRegexp(RuntimeError, "past atoms not supported", transform_program, "{'p : q}.")
         self.assertRaisesRegexp(RuntimeError, "future atoms not supported", transform_program, "{p : q'}.")
@@ -123,5 +126,36 @@ def transform(p):
 
 class TestTransform(unittest.TestCase):
     def test_transform(self):
-        self.assertEqual(transform("p."), (['#program static(__t).', 'p(__t).'], [], []))
+        self.assertEqual(transform("p."), (['#program static(t).', 'p(t).'], [], []))
+        self.assertEqual(transform("p'."), (
+            ['#program static(t).',
+             'f_p(1,(t+1)).',
+             '#program static(t).',
+             'p(t) :- f_p(1,t).'],
+            [('f_p', 2)], []))
+        self.assertEqual(transform("p'|q."), (
+            ['#program static(t).',
+             'q(t) : ; f_p(1,(t+1)) : .',
+             '#program static(t).',
+             '#external p((t+1)) : f_p(1,(t+1)).',
+             'f_p(1,(t+1)) :- p((t+1)).',
+             'p(t) :- f_p(1,t).'],
+            [('f_p', 2)], []))
+        self.assertEqual(transform("p'. p'|q."), (
+            ['#program static(t).',
+             'f_p(1,(t+1)).',
+             'q(t) : ; f_p(1,(t+1)) : .',
+             '#program static(t).',
+             '#external p((t+1)) : f_p(1,(t+1)).',
+             'f_p(1,(t+1)) :- p((t+1)).',
+             'p(t) :- f_p(1,t).'],
+            [('f_p', 2)], []))
+        self.assertEqual(transform("p'(X)|q."), (
+            ['#program static(t).',
+             'q(t) : ; f_p(X,1,(t+1)) : .',
+             '#program static(t).',
+             '#external p(X0,(t+1)) : f_p(X0,1,(t+1)).',
+             'f_p(X0,1,(t+1)) :- p(X0,(t+1)).',
+             'p(X0,t) :- f_p(X0,1,t).'],
+            [('f_p', 3)], []))
 
