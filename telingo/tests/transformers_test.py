@@ -5,6 +5,7 @@ import telingo.transformers as transformers
 
 transformers._future_prefix = "f_"
 transformers._time_parameter_name = "t"
+transformers._time_parameter_name_alt = "u"
 
 def parse_term(t):
     ret = [None]
@@ -60,7 +61,10 @@ def transform_program(p):
     c = {}
     ret = []
     t = transformers.ProgramTransformer(clingo.Function("t"), a, c)
-    clingo.parse_program(p, lambda s: ret.append(str(t.visit(s))))
+    def append(s):
+        if s is not None:
+            ret.append(str(s))
+    clingo.parse_program(p, lambda s: append(t.visit(s)))
     return (ret, a, {key: [(str(r), str(l)) for r, l in stms] for key, stms in c.items()})
 
 class TestClassify(unittest.TestCase):
@@ -104,21 +108,21 @@ class TestProgramTransformer(unittest.TestCase):
         self.assertEqual(transform_program(":- p."), (['#program static(t).', '#false :- p(t).'], {}, {}))
         self.assertEqual(transform_program(":- 'p."), (['#program static(t).', '#false :- p((t+-1)).'], {}, {}))
         self.assertEqual(transform_program(":- p'."), (
-            ['#program static(t).', '#false :- p((t+1)); __final(t).'], {},
-            {('static', 't', 1): [('#false :- p((t+1)); __final(t).', '#false :- p((t+1)).')]}))
+            ['#program static(t).'], {},
+            {('static', 1): [('#false :- p((t+1)); __final(u).', '#false :- p((t+1)).')]}))
         self.assertEqual(transform_program("not p :- p'."), (
-            ['#program static(t).', 'not p(t) :- p((t+1)); __final(t).'], {},
-            {('static', 't', 1): [('not p(t) :- p((t+1)); __final(t).', 'not p(t) :- p((t+1)).')]}))
+            ['#program static(t).'], {},
+            {('static', 1): [('not p(t) :- p((t+1)); __final(u).', 'not p(t) :- p((t+1)).')]}))
         self.assertEqual(transform_program("not 'p :- p'."), (
-            ['#program static(t).', 'not p((t+-1)) :- p((t+1)); __final(t).'], {},
-            {('static', 't', 1): [('not p((t+-1)) :- p((t+1)); __final(t).', 'not p((t+-1)) :- p((t+1)).')]}))
+            ['#program static(t).'], {},
+            {('static', 1): [('not p((t+-1)) :- p((t+1)); __final(u).', 'not p((t+-1)) :- p((t+1)).')]}))
         self.assertEqual(transform_program("not p' :- p'."), (
-            ['#program static(t).', 'not p((t+1)) :- p((t+1)); __final(t).'], {},
-            {('static', 't', 1): [('not p((t+1)) :- p((t+1)); __final(t).', 'not p((t+1)) :- p((t+1)).')]}))
+            ['#program static(t).'], {},
+            {('static', 1): [('not p((t+1)) :- p((t+1)); __final(u).', 'not p((t+1)) :- p((t+1)).')]}))
         # body aggregates
         self.assertEqual(transform_program(":- {p':q'}."), (
-            ['#program static(t).', '#false :- { p((t+1)) : q((t+1)) }; __final(t).'], {},
-            {('static', 't', 1): [('#false :- { p((t+1)) : q((t+1)) }; __final(t).', '#false :- { p((t+1)) : q((t+1)) }.')]}))
+            ['#program static(t).'], {},
+            {('static', 1): [('#false :- { p((t+1)) : q((t+1)) }; __final(u).', '#false :- { p((t+1)) : q((t+1)) }.')]}))
 
 def transform(p):
     r, f, c = transformers.transform([p])
@@ -158,4 +162,12 @@ class TestTransform(unittest.TestCase):
              'f_p(X0,1,(t+1)) :- p(X0,(t+1)).',
              'p(X0,t) :- f_p(X0,1,t).'],
             [('f_p', 3)], []))
+        self.assertEqual(transform(":- p''."), (
+            ['#program static(t).',
+             '#program static_0_1(t,u).',
+             '#false :- p((t+2)); __final(u).',
+             '#program static_2(t,u).',
+             '#false :- p((t+2)).'], [],
+            [('static', 'static_0_1', range(0, 2)),
+             ('static', 'static_2',   range(2, 3))]))
 

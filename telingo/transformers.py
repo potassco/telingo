@@ -46,7 +46,24 @@ omitted if a future predicate does not occur in disjunctions.
 
 Handling of constraints referring to the future
 ===============================================
-...
+The temporal program
+
+  :- p''.
+
+is rewritten into
+
+  #program static(t).
+  #program static_0_1(t,u).
+  :- p((t+2)); __final(u).
+  #program static_2(t,u).
+  :- p((t+2)).
+
+where the constraint is removed from the static part and put into two
+additional program parts which have to be grounded for time points t, t-1, and
+t-2 as given by the last return value:
+
+  [('static', 'static_0_1', range(0, 2)),
+   ('static', 'static_2',   range(2, 3))]
 """
 
 import clingo
@@ -55,6 +72,7 @@ import clingo.ast as ast
 _future_prefix = "__future_"
 _variable_prefix = "X"
 _time_parameter_name = "__t"
+_time_parameter_name_alt = "__u"
 
 class Transformer:
     """
@@ -263,9 +281,9 @@ class ProgramTransformer(Transformer):
         self.__term_transformer = TermTransformer(parameter, future_predicates)
         self.__constraint_parts = constraint_parts
 
-    def __append_final(self, x, add_param=False):
+    def __append_final(self, x, param=None):
         loc = x.location
-        x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, self.__parameter)] if add_param else [], False))));
+        x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, param)] if param is not None else [], False))));
 
     def visit(self, x, *args, **kwargs):
         """
@@ -296,8 +314,9 @@ class ProgramTransformer(Transformer):
             rule.body = self.visit(rule.body)
             if self.__max_shift[0] > 0 and not self.__final:
                 last = ast.Rule(rule.location, rule.head, rule.body[:])
-                self.__append_final(rule, True)
-                self.__constraint_parts.setdefault((self.__part, self.__parameter.name, self.__max_shift[0]), []).append((rule, last))
+                self.__append_final(rule, _time_parameter_name_alt)
+                self.__constraint_parts.setdefault((self.__part, self.__max_shift[0]), []).append((rule, last))
+                return None
         finally:
             self.__head        = False
             self.__max_shift   = [0]
@@ -381,7 +400,7 @@ def transform(inputs):
 
     Returns a list of rules, future predicates whose atoms  have to be set to
     false if referring to the future, and program parts that have to be
-    regrounded if referring to the future.
+    regrounded if there are constraints referring to the future.
     ...
     """
     loc               = {'begin': {'line': 1, 'column': 1, 'filename': '<transform>'},
@@ -391,9 +410,12 @@ def transform(inputs):
     ret               = []
 
     # apply transformer to program
+    def append(s):
+        if s is not None:
+            ret.append(s)
     transformer = ProgramTransformer(clingo.Function(_time_parameter_name), future_predicates, constraint_parts)
     for i in inputs:
-        clingo.parse_program(i, lambda s: ret.append(transformer.visit(s)))
+        clingo.parse_program(i, lambda s: append(transformer.visit(s)))
 
     # add auxiliary rules for future predicates
     future_sigs = []
@@ -417,20 +439,22 @@ def transform(inputs):
 
     # gather rules for constraints referring to the future
     reground_parts = []
-    if len(reground_parts) > 0:
-        # TODO: ...
-        assert(False)
-        '''
-        - Future Body in constraints:
-
-          simply reground at the boundary if a non-positive simple atom refers to the future!!!
-          once everything is in the past -> no problem!!!
-          #external 'q.
-
-          _f_p(t,1) :- p(t,1).
-
-          :- 'p, not 'q.
-        '''
+    if len(constraint_parts) > 0:
+        for (name, shift), rules in constraint_parts.items():
+            assert(shift > 0)
+            params = [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]
+            # parts to be regrounded
+            part = "{}_0_{}".format(name, shift-1)
+            ret.append(ast.Program(loc, part, params))
+            for p, l in rules:
+                ret.append(p)
+            reground_parts.append((name, part, range(shift)))
+            # parts that no longer have to be regrounded
+            last_part = "{}_{}".format(name, shift)
+            ret.append(ast.Program(loc, last_part, params))
+            for p, l in rules:
+                ret.append(l)
+            reground_parts.append((name, last_part, range(shift, shift+1)))
 
     return ret, future_sigs, reground_parts
 
