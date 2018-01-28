@@ -125,8 +125,9 @@ class TestProgramTransformer(unittest.TestCase):
             {('static', 1): [('#false :- { p((t+1)) : q((t+1)) }; __final(u).', '#false :- { p((t+1)) : q((t+1)) }.')]}))
 
 def transform(p):
-    r, f, c = transformers.transform([p])
-    return [str(s) for s in r], f, c
+    r = []
+    f, c = transformers.transform([p], lambda s: r.append(str(s)))
+    return r, f, c
 
 class TestTransform(unittest.TestCase):
     def test_transform(self):

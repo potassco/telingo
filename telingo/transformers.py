@@ -393,26 +393,28 @@ class ProgramTransformer(Transformer):
         sig.arity += 1
         return sig
 
-def transform(inputs):
+def transform(inputs, callback):
     """
-    Transforms the given list of temporal programs in string form into ASP
-    rules.
+    Transforms the given list of temporal programs in string form into an ASP
+    program.
 
-    Returns a list of rules, future predicates whose atoms  have to be set to
-    false if referring to the future, and program parts that have to be
-    regrounded if there are constraints referring to the future.
-    ...
+    Returns the future predicates whose atoms have to be set to false if
+    referring to the future, and program parts that have to be regrounded if
+    there are constraints referring to the future.
+
+    Arguments:
+    inputs   -- The list of inputs.
+    callback -- Callback for rewritten statements.
     """
     loc               = {'begin': {'line': 1, 'column': 1, 'filename': '<transform>'},
                          'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
     future_predicates = {}
     constraint_parts  = {}
-    ret               = []
 
     # apply transformer to program
     def append(s):
         if s is not None:
-            ret.append(s)
+            callback(s)
     transformer = ProgramTransformer(clingo.Function(_time_parameter_name), future_predicates, constraint_parts)
     for i in inputs:
         clingo.parse_program(i, lambda s: append(transformer.visit(s)))
@@ -420,7 +422,7 @@ def transform(inputs):
     # add auxiliary rules for future predicates
     future_sigs = []
     if len(future_predicates) > 0:
-        ret.append(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name)]))
+        callback(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name)]))
         for (name, arity, shift), disjunctive in future_predicates.items():
             variables = [ "{}{}".format(_variable_prefix, i) for i in range(arity) ]
             t = ast.Symbol(loc, clingo.Function(_time_parameter_name))
@@ -432,9 +434,9 @@ def transform(inputs):
             if disjunctive:
                 p_future = ast.SymbolicAtom(ast.Function(loc, name, variables + [t_shifted], False))
                 f_future =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t_shifted], False))
-                ret.append(ast.External(loc, p_future, [l(f_future)]))
-                ret.append(ast.Rule(loc, l(f_future), [l(p_future)]))
-            ret.append(ast.Rule(loc, l(p_current), [l(f_current)]))
+                callback(ast.External(loc, p_future, [l(f_future)]))
+                callback(ast.Rule(loc, l(f_future), [l(p_future)]))
+            callback(ast.Rule(loc, l(p_current), [l(f_current)]))
             future_sigs.append((_future_prefix + name, arity + 2))
 
     # gather rules for constraints referring to the future
@@ -445,16 +447,16 @@ def transform(inputs):
             params = [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]
             # parts to be regrounded
             part = "{}_0_{}".format(name, shift-1)
-            ret.append(ast.Program(loc, part, params))
+            callback(ast.Program(loc, part, params))
             for p, l in rules:
-                ret.append(p)
+                callback(p)
             reground_parts.append((name, part, range(shift)))
             # parts that no longer have to be regrounded
             last_part = "{}_{}".format(name, shift)
-            ret.append(ast.Program(loc, last_part, params))
+            callback(ast.Program(loc, last_part, params))
             for p, l in rules:
-                ret.append(l)
+                callback(l)
             reground_parts.append((name, last_part, range(shift, shift+1)))
 
-    return ret, future_sigs, reground_parts
+    return future_sigs, reground_parts
 
