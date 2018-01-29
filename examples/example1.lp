@@ -1,16 +1,29 @@
-#program initial.
-
-q(0).
-
 #program dynamic.
+shoot | load | wait.
 
-q(X+1) :- 'q(X).
-r(X) :- 'r(X).
+loaded :- load.
+loaded :- 'loaded, not unloaded.
+unloaded :- shoot, 'loaded, not broken.
+unloaded :- 'unloaded, not loaded.
 
-#program static.
+:- load, 'loaded.
 
-r(X) :- q(X).
+% determine if we failed to shoot
+failed :- 'failed.
+failed :- loaded, shoot.
+
+% two unloaded shots will break the gun
+fail_shot1 :- unloaded, shoot.
+fail_shot1 :- 'fail_shot1.
+
+fail_shot2 :- 'fail_shot1, unloaded, shoot.
+fail_shot2 :- 'fail_shot2.
+
+broken :- fail_shot2.
 
 #program final.
+% select traces where the gun broke
+:- not failed.
 
-:- #sum { X : r(X) } < 10.
+#program initial.
+unloaded.

@@ -1,8 +1,16 @@
-q(0) :- __initial.
+#program initial.
 
-q(X+1) :- 'q(X), not __initial.
-r(X) :- 'r(X), not __initial.
+q(0).
+
+#program dynamic.
+
+q(X+1) :- 'q(X).
+r(X) :- 'r(X).
+
+#program static.
 
 r(X) :- q(X).
 
-:- #sum { X : r(X) } < 10, __final.
+#program final.
+
+:- #sum { X : r(X) } < 10.
