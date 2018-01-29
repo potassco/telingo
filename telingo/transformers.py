@@ -118,7 +118,6 @@ class Transformer:
             raise TypeError("unexpected type")
 
 def str_location(loc):
-    print (loc)
     begin = loc["begin"]
     end   = loc["end"]
     ret = "{}:{}:{}".format(begin["filename"], begin["line"], begin["column"])
@@ -150,13 +149,11 @@ class TermTransformer(Transformer):
                          where shift corresponds to the number of next
                          operators.
     """
-    def __init__(self, parameter, future_predicates):
+    def __init__(self, future_predicates):
         """
         Parameters:
-        parameter         -- time parameter to extend atoms with
         future_predicates -- reference to the map of future predicates
         """
-        self.__parameter         = parameter
         self.__future_predicates = future_predicates
 
     def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, max_shift):
@@ -207,7 +204,7 @@ class TermTransformer(Transformer):
                 break
         shift += len(name) - len(n) + shift
 
-        params = [clingo.ast.Symbol(location, self.__parameter)]
+        params = [clingo.ast.Symbol(location, clingo.Function(_time_parameter_name))]
         if shift != 0:
             if fail_future and shift > 0:
                 raise RuntimeError("future atoms not supported in this context: {}".format(str_location(location)))
@@ -284,19 +281,17 @@ class ProgramTransformer(Transformer):
                           future. Determines window to reground constraints.
                           Stored as a list with one integer element to allow
                           passing by reference.
-    __parameter        -- The time parameter appended to atoms.
     __term_transformer -- The transformer used to rewrite terms.
     __constraint_parts -- Parts that have to be regrounded because of
                           constraints referring to the future.
     """
-    def __init__(self, parameter, future_predicates, constraint_parts):
+    def __init__(self, future_predicates, constraint_parts):
         self.__final = False
         self.__head = False
         self.__constraint = False
         self.__normal = False
         self.__max_shift = [0]
-        self.__parameter = parameter
-        self.__term_transformer = TermTransformer(parameter, future_predicates)
+        self.__term_transformer = TermTransformer(future_predicates)
         self.__constraint_parts = constraint_parts
 
     def __append_final(self, x, param=None):
@@ -388,7 +383,7 @@ class ProgramTransformer(Transformer):
             prg.name = "static"
         if prg.name == "base":
             prg.name = "static"
-        prg.parameters.append(clingo.ast.Id(prg.location, self.__parameter.name))
+        prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name))
         prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name_alt))
         self.__part = prg.name
         return prg
@@ -436,7 +431,7 @@ def transform(inputs, callback):
     def append(s):
         if s is not None:
             callback(s)
-    transformer = ProgramTransformer(clingo.Function(_time_parameter_name), future_predicates, constraint_parts)
+    transformer = ProgramTransformer(future_predicates, constraint_parts)
     for i in inputs:
         clingo.parse_program(i, lambda s: append(transformer.visit(s)))
 

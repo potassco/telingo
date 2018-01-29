@@ -21,7 +21,7 @@ def parse_term(t):
 def transform_term(s, replace_future=False, fail_future=False, fail_past=False):
     a = set()
     m = [0]
-    t = transformers.TermTransformer(clingo.Function(transformers._time_parameter_name), a)
+    t = transformers.TermTransformer(a)
     return str(t.visit(parse_term(s), replace_future, fail_future, fail_past, m)), a, m[0]
 
 class TestTermTransformer(TestCase):
@@ -63,7 +63,7 @@ def transform_program(p):
     a = set()
     c = {}
     ret = []
-    t = transformers.ProgramTransformer(clingo.Function(transformers._time_parameter_name), a, c)
+    t = transformers.ProgramTransformer(a, c)
     def append(s):
         if s is not None:
             ret.append(str(s))
