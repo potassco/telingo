@@ -116,8 +116,12 @@ class Application:
         """
         Parse imax argument.
         """
-        self.__imax = int(value)
-        return self.__imax >= 0
+        if len(value) > 0:
+            self.__imax = int(value)
+            return self.__imax >= 0
+        else:
+            self.__imax = None
+            return True
 
     def __parse_istop(self, value):
         """
@@ -132,7 +136,7 @@ class Application:
         """
         group = "Telingo Options"
         options.add(group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
-        options.add(group, "imax", "Maximum number of solving steps", self.__parse_imax, argument="<n>")
+        options.add(group, "imax", "Maximum number of solving steps []", self.__parse_imax, argument="<n>")
         options.add(group, "istop", dedent("""\
             Stop criterion [sat]
                   <arg>: {sat|unsat|unknown}"""), self.__parse_istop)
