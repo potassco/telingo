@@ -2,11 +2,6 @@
 
 `Telingo` is a solver for temporal programs.
 
-## Warning
-
-Currently `telingo` only works with the upcoming 5.3 version of `clingo`. So
-for now the work-in-progress (wip) branch of `clingo` has to be used.
-
 # Usage
 
 ```
@@ -23,9 +18,14 @@ Either run `telingo` directly from source or install it by the usual means
 provided by Python.  We also provide anaconda packages for easy installation of
 all dependencies:
 
-```
-https://anaconda.org/potassco/telingo
-```
+- <https://anaconda.org/potassco/telingo>
+
+## Warning
+
+Currently `telingo` only works with the upcoming 5.3 version of `clingo`. So
+for now the work-in-progress (wip) branch of `clingo` has to be used. If
+installing with anaconda, make sure to install the development packages of
+clingo.
 
 # Input
 
