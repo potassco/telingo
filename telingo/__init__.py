@@ -1,10 +1,30 @@
+"""
+The telingo module contains functions to translate and solve temporal logic
+programs.
+"""
+
 import sys
 import clingo
 import telingo.transformers as transformers
+from textwrap import dedent
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
     """
     Take a program object and runs the incremental main solving loop.
+
+    For each pair (name, arity) in future_sigs all atoms in the program base
+    with the time parameter referring to the future are set to false. For
+    example, given (p, 2) and atoms  p(x,1) in step 0, the atom would p(x,1)
+    would be set to false via an assumption. In the following time steps, it
+    would not be set to False.
+
+    The list program_parts contains all program parts appearing in the program
+    in form of triples (root, name, range) where root is either "initial" (time
+    step 0), "static" (time steps >= 0), or "dynamic" (time steps > 0) and
+    range is a list of integers for which the part has to be grounded
+    backwards. Given range [0, 1] and root "static", at each iteration the
+    program part would be grounded at horizon and horizon-1. The latter only if
+    the horizon is greater than 0.
 
     Arguments:
     prg           -- Control object holding the program.
@@ -14,8 +34,6 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imin          -- Minimum number of iterations.
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
-
-    TODO: explain future_sigs and parts a bit more
     """
     step, ret = 0, None
     while ((imax is None or step < imax) and
@@ -45,7 +63,10 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
 
 class Application:
     """
-    TODO: document
+    Application object as accepted by clingo.clingo_main().
+
+    Rewrites the incoming temporal logic programs into incremental ASP programs
+    and solves them.
     """
     def __init__(self, name):
         """
@@ -54,13 +75,9 @@ class Application:
         See clingo.clingo_main().
         """
         self.program_name = name
-
-    def __get(self, prg, name, attr, default):
-        """
-        TODO: Remove and handle --imin, --imax, and --istop using options.
-        """
-        val = prg.get_const(name)
-        return getattr(val, attr) if val is not None else default
+        self.__imin = 0
+        self.__imax = None
+        self.__istop = "SAT"
 
     def __on_model(self, model, steps):
         """
@@ -88,21 +105,49 @@ class Application:
             sys.stdout.write("\n".format(step))
         return True
 
+    def __parse_imin(self, value):
+        """
+        Parse imin argument.
+        """
+        self.__imin = int(value)
+        return self.__imin >= 0
+
+    def __parse_imax(self, value):
+        """
+        Parse imax argument.
+        """
+        self.__imax = int(value)
+        return self.__imax >= 0
+
+    def __parse_istop(self, value):
+        """
+        Parse istop argument.
+        """
+        self.__istop = value.upper()
+        return self.__istop in ["SAT", "UNSAT", "UNKNOWN"]
+
+    def register_options(self, options):
+        """
+        See clingo.clingo_main().
+        """
+        group = "Telingo Options"
+        options.add(group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
+        options.add(group, "imax", "Maximum number of solving steps", self.__parse_imax, argument="<n>")
+        options.add(group, "istop", dedent("""\
+            Stop criterion [sat]
+                  <arg>: {sat|unsat|unknown}"""), self.__parse_istop)
+
     def main(self, prg, files):
         """
-        Implements the main control loop.
+        Implements the incremental solving loop.
 
         This function implements the Application.main() function as required by
         clingo.clingo_main().
         """
-        imin   = self.__get(prg, "imin", "number", 0)
-        imax   = self.__get(prg, "imax", "number", None)
-        istop  = self.__get(prg, "istop", "string", "SAT")
-
         with prg.builder() as b:
             files = [open(f) for f in files]
             if len(files) == 0:
                 files.append(sys.stdin)
             future_sigs, program_parts = transformers.transform([f.read() for f in files], b.add)
 
-        imain(prg, future_sigs, program_parts, self.__on_model, imin, imax, istop)
+        imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
