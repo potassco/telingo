@@ -8,16 +8,17 @@ source:
 
 requirements:
   build:
+    - clingo
     - python
     - setuptools
   run:
+    - clingo
     - python
 
 build:
   script:
+    - python setup.py test
     - python setup.py install
-
-test:
 
 about:
   home:  https://potassco.org/

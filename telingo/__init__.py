@@ -151,3 +151,10 @@ class Application:
             future_sigs, program_parts = transformers.transform([f.read() for f in files], b.add)
 
         imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
+
+def main():
+    """
+    TODO: it would be cool if it where possible to replace part of the output
+    """
+    ret = clingo.clingo_main(Application(sys.argv[0]), ["-q2"] + sys.argv[1:])
+    sys.exit(int(ret))
