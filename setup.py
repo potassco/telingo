@@ -10,7 +10,7 @@ setup(
     license = 'MIT',
     packages = ['telingo'],
     test_suite = 'telingo.tests',
-    zip_safe = False
+    zip_safe = False,
     entry_points = {
         'console_scripts': [
             'telingo = telingo.main',
