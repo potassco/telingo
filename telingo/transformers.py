@@ -28,21 +28,18 @@ The temporal program
 
   p'.
 
-referring to the future in a rule head is rewritten into the following ASP
-program:
+referring to the future in a normal rule head is rewritten into the following
+ASP program:
 
   f_p(1,t+1).
 
 with auxiliary rules
 
   #program static(t).
-  #external p(t+1)   :   f_p(1,t+1). % only for disjunctions
-          f_p(1,t+1) :-    p(t+1).   % only for disjunctions
-            p(t)     :-  f_p(1,t).
+  p(t) :- f_p(1,t).
 
 and future signatures [('f_p', 2)] whose atoms have to be set to False if
-referring to the future. Note that the first two auxiliary rules can be
-omitted if a future predicate does not occur in disjunctions.
+referring to the future.
 
 Handling of constraints referring to the future
 ===============================================
@@ -128,11 +125,10 @@ class TermTransformer(Transformer):
 
     Members:
     parameter         -- Time parameter to extend atoms with.
-    future_predicates -- Reference to the map of future predicates
-                         having type '{(name, arity, shift) -> disjuntive}'
+    future_predicates -- Reference to the set of future predicates
+                         having type '{(name, arity, shift)}'
                          where shift corresponds to the number of next
-                         operators and disjunctive determines if the predicate
-                         occurred in a disjunction.
+                         operators.
     """
     def __init__(self, parameter, future_predicates):
         """
@@ -143,7 +139,7 @@ class TermTransformer(Transformer):
         self.__parameter         = parameter
         self.__future_predicates = future_predicates
 
-    def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, disjunctive, max_shift):
+    def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, max_shift):
         """
         Strips previous and next operators from function names
         and returns the updated name plus the time arguments to append.
@@ -199,11 +195,7 @@ class TermTransformer(Transformer):
                 raise RuntimeError("past atoms not supported in this context: {}".format(location))
             if shift > 0:
                 if replace_future:
-                    key = (n, arity, shift)
-                    if disjunctive:
-                        self.__future_predicates[key] = True
-                    else:
-                        self.__future_predicates.setdefault(key, False)
+                    self.__future_predicates.add((n, arity, shift))
                     n = _future_prefix + n
                     params.insert(0, clingo.ast.Symbol(location, shift))
                 else:
@@ -235,11 +227,17 @@ def is_constraint(s):
     Check if the given AST node is a constraint.
 
     As a special case this function also considers rules with a negative
-    literal in the head as a disjunction.
+    literal in the head as a constraint.
     """
     return (s.type == ast.ASTType.Rule and s.head.type == ast.ASTType.Literal and
             ((s.head.atom.type == ast.ASTType.BooleanConstant and not s.head.atom.value) or
              (s.head.sign != ast.Sign.NoSign)))
+
+def is_normal(s):
+    return (s.type == ast.ASTType.Rule and
+            s.head.type == ast.ASTType.Literal and
+            s.head.sign == ast.Sign.NoSign and
+            s.head.atom.type == ast.ASTType.SymbolicAtom)
 
 def is_disjunction(s):
     """
@@ -261,7 +259,7 @@ class ProgramTransformer(Transformer):
                           indicates that the __final atom has to be appended.
     __head             -- Indicates that the head of a rule is being visited.
     __constraint       -- Whether the current statement is a constraint.
-    __disjunction      -- Wether the current statement is a disjunction.
+    __normal           -- Whether the current statement is a normal rule.
     __max_shift        -- The maximum number of steps a rule looks into the
                           future. Determines window to reground constraints.
                           Stored as a list with one integer element to allow
@@ -275,7 +273,7 @@ class ProgramTransformer(Transformer):
         self.__final = False
         self.__head = False
         self.__constraint = False
-        self.__disjunction = False
+        self.__normal = False
         self.__max_shift = [0]
         self.__parameter = parameter
         self.__term_transformer = TermTransformer(parameter, future_predicates)
@@ -308,20 +306,20 @@ class ProgramTransformer(Transformer):
             self.__head = True
             self.__max_shift = [0]
             self.__constraint = is_constraint(rule)
-            self.__disjunction = is_disjunction(rule)
+            self.__normal = is_normal(rule)
             rule.head = self.visit(rule.head)
             self.__head = False
             rule.body = self.visit(rule.body)
             if self.__max_shift[0] > 0 and not self.__final:
                 last = ast.Rule(rule.location, rule.head, rule.body[:])
-                self.__append_final(rule, _time_parameter_name_alt)
+                self.__append_final(rule, clingo.Function(_time_parameter_name_alt))
                 self.__constraint_parts.setdefault((self.__part, self.__max_shift[0]), []).append((rule, last))
                 return None
         finally:
             self.__head        = False
             self.__max_shift   = [0]
             self.__constraint  = False
-            self.__disjunction = False
+            self.__normal = False
         return rule
 
     def visit_Literal(self, literal):
@@ -355,7 +353,7 @@ class ProgramTransformer(Transformer):
         If this atom appears in a head then it is also replaced by a
         corresponding future atom defined later.
         """
-        atom.term = self.__term_transformer.visit(atom.term, self.__head, not self.__head and not self.__constraint, self.__head, self.__head and self.__disjunction, self.__max_shift)
+        atom.term = self.__term_transformer.visit(atom.term, self.__head, not self.__constraint and (not self.__head or not self.__normal), self.__head, self.__max_shift)
         return atom
 
     def visit_Program(self, prg):
@@ -371,6 +369,7 @@ class ProgramTransformer(Transformer):
         if prg.name == "base":
             prg.name = "static"
         prg.parameters.append(clingo.ast.Id(prg.location, self.__parameter.name))
+        prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name_alt))
         self.__part = prg.name
         return prg
 
@@ -408,7 +407,7 @@ def transform(inputs, callback):
     """
     loc               = {'begin': {'line': 1, 'column': 1, 'filename': '<transform>'},
                          'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
-    future_predicates = {}
+    future_predicates = set()
     constraint_parts  = {}
     time              = ast.Symbol(loc, clingo.Function(_time_parameter_name))
     wrap_lit          = lambda a: ast.Literal(loc, ast.Sign.NoSign, a)
@@ -424,18 +423,13 @@ def transform(inputs, callback):
     # add auxiliary rules for future predicates
     future_sigs = []
     if len(future_predicates) > 0:
-        callback(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name)]))
-        for (name, arity, shift), disjunctive in future_predicates.items():
-            variables = [ "{}{}".format(_variable_prefix, i) for i in range(arity) ]
+        callback(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]))
+        for name, arity, shift in sorted(future_predicates):
+            variables = [ ast.Variable(loc, "{}{}".format(_variable_prefix, i)) for i in range(arity) ]
             s = ast.Symbol(loc, clingo.Number(shift))
             t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, time, s)
             p_current = ast.SymbolicAtom(ast.Function(loc, name, variables + [time], False))
             f_current =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, time], False))
-            if disjunctive:
-                p_future = ast.SymbolicAtom(ast.Function(loc, name, variables + [t_shifted], False))
-                f_future =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, t_shifted], False))
-                callback(ast.External(loc, p_future, [wrap_lit(f_future)]))
-                callback(ast.Rule(loc, wrap_lit(f_future), [wrap_lit(p_future)]))
             callback(ast.Rule(loc, wrap_lit(p_current), [wrap_lit(f_current)]))
             future_sigs.append((_future_prefix + name, arity + 2))
 
@@ -459,7 +453,7 @@ def transform(inputs, callback):
             reground_parts.append((name, last_part, range(shift, shift+1)))
 
     def add_part(part_name, atom_name, statement, wrap=lambda x: x):
-        params = [ast.Id(loc, _time_parameter_name)]
+        params = [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]
         callback(ast.Program(loc, part_name, params))
         atom = wrap(ast.SymbolicAtom(ast.Function(loc, atom_name, [time], False)))
         callback(statement(loc, atom, []))

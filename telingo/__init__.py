@@ -29,7 +29,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
                 if ((step - i >= 0 and root_name == "static") or
                     (step - i  > 0 and root_name == "dynamic") or
                     (step - i == 0 and root_name == "initial")):
-                    parts.append((part_name, [step - i]))
+                    parts.append((part_name, [step - i, step]))
         if step > 0:
             prg.release_external(clingo.Function("__final", [step-1]))
             prg.cleanup()
@@ -41,7 +41,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
             for atom in prg.symbolic_atoms.by_signature(name, arity):
                 if atom.symbol.arguments[-1].number > step:
                     assumptions.append(-atom.literal)
-        ret, step = prg.solve(on_model=on_model, assumptions=assumptions), step+1
+        ret, step = prg.solve(on_model=lambda m: on_model(m, step), assumptions=assumptions), step+1
 
 class Application:
     """
@@ -62,23 +62,29 @@ class Application:
         val = prg.get_const(name)
         return getattr(val, attr) if val is not None else default
 
-    def __on_model(self, model):
+    def __on_model(self, model, steps):
         """
         Prints the atoms in a model grouped by state.
+
+        Arguments:
+        model -- The model to print.
+        steps -- The number of states.
         """
         table = {}
         for sym in model.symbols(shown=True):
             if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1], []).append(clingo.Function(sym.name, sym.arguments[:-1]))
+                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1]))
         sys.stdout.write("Answer: {}\n".format(model.number))
-        for step, symbols in sorted(table.items()):
+        for step in range(steps+1):
+            symbols = table.get(step, [])
             sys.stdout.write(" State {}:".format(step))
             sig = None
             for sym in sorted(symbols):
-                if (sym.name, len(sym.arguments)) != sig:
-                    sys.stdout.write("\n ")
-                    sig = (sym.name, len(sym.arguments))
-                sys.stdout.write(" {}".format(sym))
+                if not sym.name.startswith('__'):
+                    if (sym.name, len(sym.arguments)) != sig:
+                        sys.stdout.write("\n ")
+                        sig = (sym.name, len(sym.arguments))
+                    sys.stdout.write(" {}".format(sym))
             sys.stdout.write("\n".format(step))
         return True
 
