@@ -7,5 +7,9 @@ setup(
     name = 'telingo',
     description = 'System to solve temporal logic programs.',
     author = 'Roland Kaminski',
-    test_suite = 'telingo.tests')
+    license = 'MIT',
+    packages = ['telingo'],
+    test_suite = 'telingo.tests',
+    zip_safe = False
+    )
 

@@ -1,0 +1,28 @@
+package:
+  name: telingo
+  version: "1.0"
+
+source:
+  git_rev: wip
+  git_url: https://github.com/rkaminsk/telingo.git
+
+requirements:
+  build:
+    - python
+    - setuptools
+  run:
+    - python
+
+build:
+  script:
+    - python setup.py install
+
+test:
+
+about:
+  home:  https://potassco.org/
+  license: MIT
+  summary: A solver for temporal logic programs.
+  description: Telingo is a solver for temporal logic programs.
+  license_file: LICENSE.md
+
