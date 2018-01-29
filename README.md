@@ -14,6 +14,19 @@ telingo --help
 telingo examples/example1.lp
 ```
 
+To use `telingo` directly form source run `python -m telingo` from the
+project's root directory.
+
+# Installation
+
+Either run `telingo` directly from source or install it by the usual means
+provided by Python.  We also provide anaconda packages for easy installation of
+all dependencies:
+
+```
+https://anaconda.org/potassco/telingo
+```
+
 # Input
 
 To refer to an atom in the previous state, the atom has to be prefixed with a
