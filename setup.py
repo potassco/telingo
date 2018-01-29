@@ -13,7 +13,7 @@ setup(
     zip_safe = False,
     entry_points = {
         'console_scripts': [
-            'telingo = telingo.main',
+            'telingo = telingo:main',
         ]
     }
 )
