@@ -117,6 +117,26 @@ class Transformer:
         else:
             raise TypeError("unexpected type")
 
+def str_location(loc):
+    print (loc)
+    begin = loc["begin"]
+    end   = loc["end"]
+    ret = "{}:{}:{}".format(begin["filename"], begin["line"], begin["column"])
+    dash = True
+    eq = begin["filename"] == end["filename"]
+    if not eq:
+        ret += "{}{}".format("-" if dash else ":", end["filename"])
+        dash = False
+    eq = eq and begin["line"] == end["line"]
+    if not eq:
+        ret += "{}{}".format("-" if dash else ":", end["line"])
+        dash = False
+    eq = eq and begin["column"] == end["column"]
+    if not eq:
+        ret += "{}{}".format("-" if dash else ":", end["column"])
+        dash = False
+    return ret
+
 class TermTransformer(Transformer):
     """
     This class traverses the AST of a term until a Function is found. It then
@@ -190,9 +210,9 @@ class TermTransformer(Transformer):
         params = [clingo.ast.Symbol(location, self.__parameter)]
         if shift != 0:
             if fail_future and shift > 0:
-                raise RuntimeError("future atoms not supported in this context: {}".format(location))
+                raise RuntimeError("future atoms not supported in this context: {}".format(str_location(location)))
             if fail_past and shift < 0:
-                raise RuntimeError("past atoms not supported in this context: {}".format(location))
+                raise RuntimeError("past atoms not supported in this context: {}".format(str_location(location)))
             if shift > 0:
                 if replace_future:
                     self.__future_predicates.add((n, arity, shift))
