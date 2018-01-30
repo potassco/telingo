@@ -1,29 +1,46 @@
+{% set data = load_setup_py_data() %}
+{% set name = 'telingo' %}
+{% set version = data.get('version') %}
+{% set dev = true %}
+{% set build = 0 %}
+
 package:
-  name: telingo
-  version: "1.0"
+  name: {{ name }}
+  version: {{ version }}
 
 source:
+{% if dev %}
   git_rev: wip
-  git_url: https://github.com/rkaminsk/telingo.git
+  git_url: https://github.com/rkaminsk/{{ name }}.git
+{% else %}
+  url: https://github.com/potassco/{{ name }}/archive/v{{ version }}.zip
+{% endif %}
 
 requirements:
   build:
-    - clingo
+    - clingo >=5.3.0
     - python
     - setuptools
   run:
-    - clingo
+    - clingo >=5.3.0
     - python
 
 build:
+  noarch: python
+  number: {{ build }}
   script:
     - python setup.py test
-    - python setup.py install
+    - python setup.py install --single-version-externally-managed --record record.txt
 
 about:
   home:  https://potassco.org/
   license: MIT
-  summary: A solver for temporal logic programs.
-  description: Telingo is a solver for temporal logic programs.
+  license_family: MIT
   license_file: LICENSE.md
+  summary: A solver for temporal logic programs.
+  description: |
+      Telingo is a solver for temporal logic programs.
+  license_file: LICENSE.md
+  doc_url: https://potassco.org/
+  dev_url: https://github.com/rkaminsk/{{ name }}
 
