@@ -43,7 +43,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(solve(":- not p'', __initial. {p}."), [['p(0)', 'p(1)', 'p(2)'], ['p(0)', 'p(2)'], ['p(1)', 'p(2)'], ['p(2)']])
 
     def test_program(self):
-        self.assertEqual(solve("#program static. p.", imin=2), [['p(0)'], ['p(0)', 'p(1)']])
+        self.assertEqual(solve("#program always. p.", imin=2), [['p(0)'], ['p(0)', 'p(1)']])
         self.assertEqual(solve("#program initial. p.", imin=2), [['p(0)'], ['p(0)']])
         self.assertEqual(solve("#program final. p.", imin=2), [['p(0)'], ['p(1)']])
         self.assertEqual(solve("#program dynamic. p.", imin=2), [[], ['p(1)']])

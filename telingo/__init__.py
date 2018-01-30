@@ -20,9 +20,9 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
 
     The list program_parts contains all program parts appearing in the program
     in form of triples (root, name, range) where root is either "initial" (time
-    step 0), "static" (time steps >= 0), or "dynamic" (time steps > 0) and
+    step 0), "always" (time steps >= 0), or "dynamic" (time steps > 0) and
     range is a list of integers for which the part has to be grounded
-    backwards. Given range [0, 1] and root "static", at each iteration the
+    backwards. Given range [0, 1] and root "always", at each iteration the
     program part would be grounded at horizon and horizon-1. The latter only if
     the horizon is greater than 0.
 
@@ -44,7 +44,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
         parts = []
         for root_name, part_name, rng in program_parts:
             for i in rng:
-                if ((step - i >= 0 and root_name == "static") or
+                if ((step - i >= 0 and root_name == "always") or
                     (step - i  > 0 and root_name == "dynamic") or
                     (step - i == 0 and root_name == "initial")):
                     parts.append((part_name, [step - i, step]))

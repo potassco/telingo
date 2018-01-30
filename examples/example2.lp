@@ -7,7 +7,7 @@ q(0).
 q(X+1) :- 'q(X).
 r(X) :- 'r(X).
 
-#program static.
+#program always.
 
 r(X) :- q(X).
 

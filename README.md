@@ -42,7 +42,7 @@ negative rule heads).
 The following program parts are accepted:
 
 - `#program initial.` which applies only to the first state
-- `#program static.` which applies to each state
+- `#program always.` which applies to each state
 - `#program dynamic.` which applies to all except the first state
 - `#program final.` which applies only to the last state
 

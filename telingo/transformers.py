@@ -35,7 +35,7 @@ ASP program:
 
 with auxiliary rules
 
-  #program static(t).
+  #program always(t).
   p(t) :- f_p(1,t).
 
 and future signatures [('f_p', 2)] whose atoms have to be set to False if
@@ -49,18 +49,18 @@ The temporal program
 
 is rewritten into
 
-  #program static(t).
-  #program static_0_1(t,u).
+  #program always(t).
+  #program always_0_1(t,u).
   :- p((t+2)); __final(u).
-  #program static_2(t,u).
+  #program always_2(t,u).
   :- p((t+2)).
 
-where the constraint is removed from the static part and put into two
+where the constraint is removed from the always part and put into two
 additional program parts which have to be grounded for time points t, t-1, and
 t-2 as given by the last return value:
 
-  [('static', 'static_0_1', range(0, 2)),
-   ('static', 'static_2',   range(2, 3))]
+  [('always', 'always_0_1', range(0, 2)),
+   ('always', 'always_2',   range(2, 3))]
 """
 
 import clingo
@@ -271,7 +271,7 @@ class ProgramTransformer(Transformer):
     Statements should be passed one after the other to the visit method.
 
     Members:
-    __final            -- Final rules are put into the static program part and
+    __final            -- Final rules are put into the always program part and
                           the __final atom put into their body. This flag
                           indicates that the __final atom has to be appended.
     __head             -- Indicates that the head of a rule is being visited.
@@ -375,14 +375,14 @@ class ProgramTransformer(Transformer):
         """
         Adds the time parameter to the given program given directive.
 
-        Furthermore, the final program part is turned into a static program
+        Furthermore, the final program part is turned into an always program
         part and the __final flag set accordingly.
         """
         self.__final = prg.name == "final"
         if self.__final:
-            prg.name = "static"
+            prg.name = "always"
         if prg.name == "base":
-            prg.name = "static"
+            prg.name = "always"
         prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name))
         prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name_alt))
         self.__part = prg.name
@@ -438,7 +438,7 @@ def transform(inputs, callback):
     # add auxiliary rules for future predicates
     future_sigs = []
     if len(future_predicates) > 0:
-        callback(ast.Program(loc, "static", [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]))
+        callback(ast.Program(loc, "always", [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]))
         for name, arity, shift in sorted(future_predicates):
             variables = [ ast.Variable(loc, "{}{}".format(_variable_prefix, i)) for i in range(arity) ]
             s = ast.Symbol(loc, clingo.Number(shift))
@@ -473,9 +473,9 @@ def transform(inputs, callback):
         atom = wrap(ast.SymbolicAtom(ast.Function(loc, atom_name, [time], False)))
         callback(statement(loc, atom, []))
     add_part('initial', '__initial', ast.Rule, wrap_lit)
-    add_part('static', '__final', ast.External)
+    add_part('always', '__final', ast.External)
 
-    reground_parts.append(('static',  'static',  range(1)))
+    reground_parts.append(('always',  'always',  range(1)))
     reground_parts.append(('dynamic', 'dynamic', range(1)))
     reground_parts.append(('initial', 'initial', range(1)))
 
