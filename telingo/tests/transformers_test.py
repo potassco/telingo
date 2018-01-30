@@ -132,7 +132,10 @@ class TestProgramTransformer(TestCase):
 
 def transform(p):
     r = []
-    f, c = transformers.transform([p], lambda s: r.append(str(s)))
+    def append(s):
+        if s.type != ast.ASTType.TheoryDefinition:
+            r.append(str(s))
+    f, c = transformers.transform([p], append)
     return r, f, c
 
 class TestTransform(unittest.TestCase):

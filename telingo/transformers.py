@@ -65,6 +65,7 @@ t-2 as given by the last return value:
 
 import clingo
 import clingo.ast as ast
+from textwrap import dedent
 
 _future_prefix = "__future_"
 _variable_prefix = "X"
@@ -479,5 +480,33 @@ def transform(inputs, callback):
     reground_parts.append(('dynamic', 'dynamic', range(1)))
     reground_parts.append(('initial', 'initial', range(1)))
 
-    return future_sigs, reground_parts
+    def no_program(s):
+        if s.type != ast.ASTType.Program:
+            callback(s)
 
+    clingo.parse_program(dedent('''\
+        #theory tel {
+            formula  {
+                ~  : 4, unary; % negation
+                <  : 4, unary; % previous
+                <: : 4, unary; % weak previous
+                <? : 4, unary; % eventually-
+                <* : 4, unary; % always-
+                >  : 4, unary; % next
+                >: : 4, unary; % weak next
+                >? : 4, unary; % eventually+
+                >* : 4, unary; % always+
+                >* : 3, binary, left; % release
+                >? : 3, binary, left; % until
+                <* : 3, binary, left; % trigger
+                <? : 3, binary, left; % since
+                &  : 2, binary, left; % and
+                |  : 1, binary, left; % or
+                <- : 0, binary, left; % left implication
+                -> : 0, binary, left; % right implication
+                <> : 0, binary, left  % equivalence
+            };
+            &tel/0 : formula, body
+        }.
+        '''), no_program)
+    return future_sigs, reground_parts
