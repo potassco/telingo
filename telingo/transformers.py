@@ -277,6 +277,9 @@ class ProgramTransformer(Transformer):
                           indicates that the __final atom has to be appended.
     __head             -- Indicates that the head of a rule is being visited.
     __constraint       -- Whether the current statement is a constraint.
+    __negation         -- Whether the child nodes are in the scope of a
+                          negation (this is overridden by positive nested
+                          literals).
     __normal           -- Whether the current statement is a normal rule.
     __max_shift        -- The maximum number of steps a rule looks into the
                           future. Determines window to reground constraints.
@@ -290,6 +293,7 @@ class ProgramTransformer(Transformer):
         self.__final = False
         self.__head = False
         self.__constraint = False
+        self.__negation = False
         self.__normal = False
         self.__max_shift = [0]
         self.__term_transformer = TermTransformer(future_predicates)
@@ -344,9 +348,11 @@ class ProgramTransformer(Transformer):
         """
         head = self.__head
         try:
+            self.__negation = literal.sign != ast.Sign.NoSign
             self.__head = self.__head and literal.sign == ast.Sign.NoSign
             return self.visit_children(literal)
         finally:
+            self.__negation = False
             self.__head = head
 
     def visit_ConditionalLiteral(self, literal):
@@ -370,6 +376,15 @@ class ProgramTransformer(Transformer):
         corresponding future atom defined later.
         """
         atom.term = self.__term_transformer.visit(atom.term, self.__head, not self.__constraint and (not self.__head or not self.__normal), self.__head, self.__max_shift)
+        return atom
+
+    def visit_TheoryAtom(self, atom):
+        """
+        Rewrites theory atoms of form `&tel {...}` to `&tel(k) {...}.`
+        """
+        if not self.__negation and not self.__constraint:
+            raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
+        atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
         return atom
 
     def visit_Program(self, prg):
@@ -506,7 +521,7 @@ def transform(inputs, callback):
                 -> : 0, binary, left; % right implication
                 <> : 0, binary, left  % equivalence
             };
-            &tel/0 : formula, body
+            &tel/1 : formula, body
         }.
         '''), no_program)
     return future_sigs, reground_parts
