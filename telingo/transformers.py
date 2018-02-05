@@ -384,6 +384,8 @@ class ProgramTransformer(Transformer):
         """
         if not self.__negation and not self.__constraint:
             raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
+        if len(atom.elements) != 1 or len(atom.elements[0].condition):
+            raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
         atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
         return atom
 

@@ -6,6 +6,7 @@ programs.
 import sys
 import clingo
 import telingo.transformers as transformers
+import telingo.formulas as formulas
 from textwrap import dedent
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
@@ -35,6 +36,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
     """
+    f = formulas.Formulas()
     step, ret = 0, None
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (
@@ -53,6 +55,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
             prg.cleanup()
 
         prg.ground(parts)
+        f.translate(step, prg)
         prg.assign_external(clingo.Function("__final", [step]), True)
         assumptions = []
         for name, arity in future_sigs:

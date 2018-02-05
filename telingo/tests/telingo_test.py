@@ -47,3 +47,6 @@ class TestMain(unittest.TestCase):
         self.assertEqual(solve("#program initial. p.", imin=2), [['p(0)'], ['p(0)']])
         self.assertEqual(solve("#program final. p.", imin=2), [['p(0)'], ['p(1)']])
         self.assertEqual(solve("#program dynamic. p.", imin=2), [[], ['p(1)']])
+
+    def test_theory(self):
+        self.assertEqual(solve("{p}. q :- not &tel {p}."), [['p(0)'], ['q(0)']])

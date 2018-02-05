@@ -138,11 +138,15 @@ class TestProgramTransformer(TestCase):
             {('always', 1): [('#false :- { p((__t+1)) : q((__t+1)) }; __final(__u).', '#false :- { p((__t+1)) : q((__t+1)) }.')]}))
 
     def test_theory(self):
-        self.assertEqual(transform_program(":- &tel { }."), (['#program always(__t,__u).', '#false :- &tel(__t) {  }.'], set(), {}))
-        self.assertEqual(transform_program("a :- not &tel { }."), (['#program always(__t,__u).', 'a(__t) :- not &tel(__t) {  }.'], set(), {}))
-        self.assertEqual(transform_program("a :- not not &tel { }."), (['#program always(__t,__u).', 'a(__t) :- not not &tel(__t) {  }.'], set(), {}))
-        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "a :- &tel { }.")
-        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { } :- a.")
+        self.assertEqual(transform_program(":- &tel { a }."), (['#program always(__t,__u).', '#false :- &tel(__t) { a :  }.'], set(), {}))
+        self.assertEqual(transform_program("a :- not &tel { a }."), (['#program always(__t,__u).', 'a(__t) :- not &tel(__t) { a :  }.'], set(), {}))
+        self.assertEqual(transform_program("a :- not not &tel { a }."), (['#program always(__t,__u).', 'a(__t) :- not not &tel(__t) { a :  }.'], set(), {}))
+        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "a :- &tel { a }.")
+        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
+        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
+        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a : a }.")
+        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { }.")
+        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a; b }.")
 
 def transform(p):
     r = []
