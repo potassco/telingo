@@ -51,3 +51,11 @@ class TestMain(unittest.TestCase):
     def test_theory(self):
         self.assertEqual(solve("{p}. q :- not &tel {p}."), [['p(0)'], ['q(0)']])
         self.assertEqual(solve("{p}. q :- not &tel {p}. r :- not &tel {p}."), [['p(0)'], ['q(0)', 'r(0)']])
+        self.assertEqual(solve('{p(1,a,(1,a),f(2,a),"test",#inf,#sup)}. q(0) :- not &tel {p(1,a,(1,a),f(2,a),"test",#inf,#sup)}.'), [['p(1,a,(1,a),f(2,a),"test",#inf,#sup,0)'], ['q(0,0)']])
+        self.assertEqual(solve("{p; q}. :- not &tel {p & q}."), [['p(0)', 'q(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {p | q}."), [[]])
+        self.assertEqual(solve("{p; q}. :- &tel {p <> q}."), [[], ['p(0)', 'q(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {p -> q}."), [['p(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {p <- q}."), [['q(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {~p | ~q}."), [['p(0)', 'q(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {~(~p & ~q)}."), [[]])
