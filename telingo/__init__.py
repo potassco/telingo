@@ -55,9 +55,8 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
             prg.cleanup()
 
         prg.ground(parts)
-        f.translate(step, prg)
+        assumptions = f.translate(step, prg)
         prg.assign_external(clingo.Function("__final", [step]), True)
-        assumptions = []
         for name, arity in future_sigs:
             for atom in prg.symbolic_atoms.by_signature(name, arity):
                 if atom.symbol.arguments[-1].number > step:

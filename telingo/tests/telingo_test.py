@@ -50,3 +50,4 @@ class TestMain(unittest.TestCase):
 
     def test_theory(self):
         self.assertEqual(solve("{p}. q :- not &tel {p}."), [['p(0)'], ['q(0)']])
+        self.assertEqual(solve("{p}. q :- not &tel {p}. r :- not &tel {p}."), [['p(0)'], ['q(0)', 'r(0)']])
