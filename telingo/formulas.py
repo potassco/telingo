@@ -24,7 +24,6 @@ class StepData:
             backend.add_rule([self.literal], [], True)
         return self.literal
 
-
 class Context:
     def __init__(self, backend, symbols, add_todo, false_literal, horizon):
         self.add_todo        = add_todo
@@ -63,6 +62,11 @@ class Formula:
 
 class Atom(Formula):
     def __init__(self, rep, name, arguments = []):
+        if name.startswith("'"):
+            raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
+        if name.endswith("'"):
+            raise RuntimeError("temporal formulas use > instead of trailing primes: ".format(rep))
+
         Formula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
@@ -116,30 +120,24 @@ class BooleanBinary(Formula):
     def do_translate(self, ctx, step, data):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            lhs          = self.__lhs.translate(ctx, step)
-            rhs          = self.__rhs.translate(ctx, step)
-            data.literal = data.add_literal(ctx.backend)
-            if self.__operator == BooleanBinary.And:
-                ctx.backend.add_rule([], [-data.literal, rhs, lhs])
-                ctx.backend.add_rule([], [ data.literal, -rhs])
-                ctx.backend.add_rule([], [ data.literal, -lhs])
-            elif self.__operator == BooleanBinary.Or:
-                ctx.backend.add_rule([], [ data.literal, -rhs, -lhs])
-                ctx.backend.add_rule([], [-data.literal, rhs])
-                ctx.backend.add_rule([], [-data.literal, lhs])
-            elif self.__operator == BooleanBinary.Li:
-                ctx.backend.add_rule([], [ data.literal,  rhs, -lhs])
-                ctx.backend.add_rule([], [-data.literal, -rhs])
-                ctx.backend.add_rule([], [-data.literal,  lhs])
-            elif self.__operator == BooleanBinary.Ri:
-                ctx.backend.add_rule([], [ data.literal, -rhs, lhs])
-                ctx.backend.add_rule([], [-data.literal,  rhs])
-                ctx.backend.add_rule([], [-data.literal, -lhs])
+            lhs = self.__lhs.translate(ctx, step)
+            rhs = self.__rhs.translate(ctx, step)
+            lit = data.literal = data.add_literal(ctx.backend)
+            if self.__operator != BooleanBinary.Eq:
+                if self.__operator == BooleanBinary.And:
+                    lit, lhs, rhs = -lit, -lhs, -rhs
+                elif self.__operator == BooleanBinary.Li:
+                    rhs = -rhs
+                elif self.__operator == BooleanBinary.Ri:
+                    lhs = -lhs
+                ctx.backend.add_rule([], [ lit, -rhs, -lhs])
+                ctx.backend.add_rule([], [-lit, rhs])
+                ctx.backend.add_rule([], [-lit, lhs])
             elif self.__operator == BooleanBinary.Eq:
-                ctx.backend.add_rule([], [ data.literal,  rhs,  lhs])
-                ctx.backend.add_rule([], [ data.literal, -rhs, -lhs])
-                ctx.backend.add_rule([], [-data.literal,  rhs, -lhs])
-                ctx.backend.add_rule([], [-data.literal, -rhs,  lhs])
+                ctx.backend.add_rule([], [ lit,  rhs,  lhs])
+                ctx.backend.add_rule([], [ lit, -rhs, -lhs])
+                ctx.backend.add_rule([], [-lit,  rhs, -lhs])
+                ctx.backend.add_rule([], [-lit, -rhs,  lhs])
 
 class Negation(Formula):
     def __init__(self, rep, arg):
@@ -148,6 +146,7 @@ class Negation(Formula):
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
 
 _binary_operators = {
@@ -157,7 +156,9 @@ _binary_operators = {
     "<-": BooleanBinary.Li,
     "->": BooleanBinary.Ri}
 
-_unary_operators = set("~")
+_unary_operators = {"~"}
+
+_tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?"}
 
 def create_symbol(rep):
     if rep.type == clingo.TheoryTermType.Number:
@@ -166,7 +167,7 @@ def create_symbol(rep):
         raise RuntimeError("invalid symbol: {}".format(rep))
     else:
         name = "" if rep.type == clingo.TheoryTermType.Tuple else rep.name
-        if name in _binary_operators or name in _unary_operators:
+        if name in _binary_operators or name in _unary_operators or name in _tel_operators:
             raise RuntimeError("invalid symbol: {}".format(rep))
         args = [] if rep.type == clingo.TheoryTermType.Symbol else rep.arguments
         if len(args) == 0:
@@ -189,6 +190,8 @@ def create_formula(rep, formulas, step):
         elif rep.name in _unary_operators:
             arg = create_formula(rep.arguments[0], formulas, step)
             formula = Negation(str(rep), arg)
+        elif rep.name in _tel_operators:
+            assert(False and "implement me!!!")
         else:
             formula = Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments])
     else:

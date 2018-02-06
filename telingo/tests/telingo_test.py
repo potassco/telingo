@@ -1,7 +1,14 @@
 import unittest
+import sys
 import clingo
 import telingo
 import telingo.transformers as transformers
+
+class TestCase(unittest.TestCase):
+    def assertRaisesRegex(self, *args, **kwargs):
+        return (self.assertRaisesRegexp(*args, **kwargs)
+            if sys.version_info[0] < 3
+            else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
 
 def parse_model(m):
     ret = []
@@ -19,7 +26,7 @@ def solve(s, imin=0):
     telingo.imain(prg, future_sigs, reground_parts, lambda m, s: r.append(parse_model(m)), imax = 20, imin=imin)
     return sorted(r)
 
-class TestMain(unittest.TestCase):
+class TestMain(TestCase):
     def test_simple(self):
         self.assertEqual(solve("p."), [['p(0)']])
         self.assertEqual(solve("p :- q. {q}."), [[], ['p(0)', 'q(0)']])
@@ -48,7 +55,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(solve("#program final. p.", imin=2), [['p(0)'], ['p(1)']])
         self.assertEqual(solve("#program dynamic. p.", imin=2), [[], ['p(1)']])
 
-    def test_theory(self):
+    def test_theory_boolean(self):
         self.assertEqual(solve("{p}. q :- not &tel {p}."), [['p(0)'], ['q(0)']])
         self.assertEqual(solve("{p}. q :- not &tel {p}. r :- not &tel {p}."), [['p(0)'], ['q(0)', 'r(0)']])
         self.assertEqual(solve('{p(1,a,(1,a),f(2,a),"test",#inf,#sup)}. q(0) :- not &tel {p(1,a,(1,a),f(2,a),"test",#inf,#sup)}.'), [['p(1,a,(1,a),f(2,a),"test",#inf,#sup,0)'], ['q(0,0)']])
@@ -59,3 +66,11 @@ class TestMain(unittest.TestCase):
         self.assertEqual(solve("{p; q}. :- &tel {p <- q}."), [['q(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {~p | ~q}."), [['p(0)', 'q(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {~(~p & ~q)}."), [[]])
+
+    def test_theory_tel(self):
+        self.assertRaisesRegex(RuntimeError, "leading primes", solve, ":- &tel {'p}.")
+        self.assertRaisesRegex(RuntimeError, "trailing primes", solve, ":- &tel {p'}.")
+        # TODO: continue here...
+        #self.assertRegex(solve("{p}. :- __final,   not &tel {<p}."), [[]])
+        #self.assertEqual(solve("{p}. :- __initial, not &tel {>p}."), [[]])
+
