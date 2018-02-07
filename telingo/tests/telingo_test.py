@@ -142,3 +142,8 @@ class TestMain(TestCase):
         self.assertEqual(solve("s. {p;q;r}. :- &tel {p>*(q<?r)}.", imin=2), solve("s. {p;q;r}. :- &tel {p<*(q>?r)}.", imin=2, dual=True))
         self.assertEqual(solve("s. {p;q;r}. :- &tel {p<*(q>?r)}.", imin=2), solve("s. {p;q;r}. :- &tel {p>*(q<?r)}.", imin=2, dual=True))
 
+    def test_classical(self):
+        self.assertEqual(solve("-q."), [['-q(0)']])
+        self.assertEqual(solve("{-q}. :- not &tel{ -q }."), [['-q(0)']])
+        self.assertEqual(solve("{-q(9)}. :- not &tel{ -q(9) }."), [['-q(9,0)']])
+

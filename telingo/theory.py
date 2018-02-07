@@ -8,10 +8,27 @@ import clingo.ast as ast
 # Base for Formulas {{{1
 
 def make_equal(backend, a, b):
+    """
+    Generates clauses for a <-> b.
+
+    Arguments:
+    backend -- Backend to add clauses to.
+    a       -- first literal
+    b       -- second literal
+    """
     backend.add_rule([], [ a, -b])
     backend.add_rule([], [-a,  b])
 
 def make_disjunction(backend, e, a, b):
+    """
+    Generates clauses for e <-> a | b.
+
+    Arguments:
+    backend -- Backend to add clauses to.
+    e       -- equivalent literal
+    a       -- first literal of disjunction
+    b       -- second literal of disjunction
+    """
     backend.add_rule([], [ e, -a, -b])
     backend.add_rule([], [-e, a])
     backend.add_rule([], [-e, b])
@@ -72,7 +89,7 @@ class Formula:
 # Boolean Formulas {{{1
 
 class Atom(Formula):
-    def __init__(self, rep, name, arguments = []):
+    def __init__(self, rep, name, arguments=[], positive=True):
         if name.startswith("'"):
             raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
         if name.endswith("'"):
@@ -81,12 +98,13 @@ class Atom(Formula):
         Formula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
+        self.__positive  = positive
 
     def do_translate(self, ctx, step, data):
         # TODO: does not support classical negation for now...
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            sym = clingo.Function(self.__name, self.__arguments + [step])
+            sym = clingo.Function(self.__name, self.__arguments + [step], self.__positive)
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
@@ -132,6 +150,15 @@ class BooleanFormula(Formula):
                 ctx.backend.add_rule([], [ lit, -rhs, -lhs])
                 ctx.backend.add_rule([], [-lit,  rhs, -lhs])
                 ctx.backend.add_rule([], [-lit, -rhs,  lhs])
+
+_binary_operators = {
+    "&": BooleanFormula.And,
+    "|": BooleanFormula.Or,
+    "<>": BooleanFormula.Eq,
+    "<-": BooleanFormula.Li,
+    "->": BooleanFormula.Ri}
+
+_unary_operators = {"~"}
 
 # Temporal Formulas {{{1
 
@@ -229,18 +256,9 @@ class TelFormulaN(TelFormula):
             fut = self.__future.translate(ctx, step)
             self._translate(ctx, step, data, fut)
 
-# Theory of Formulas {{{1
-
-_binary_operators = {
-    "&": BooleanFormula.And,
-    "|": BooleanFormula.Or,
-    "<>": BooleanFormula.Eq,
-    "<-": BooleanFormula.Li,
-    "->": BooleanFormula.Ri}
-
-_unary_operators = {"~"}
-
 _tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?"}
+
+# Theory of Formulas {{{1
 
 def create_symbol(rep):
     if rep.type == clingo.TheoryTermType.Number:
@@ -261,9 +279,19 @@ def create_symbol(rep):
                 return clingo.String(name[1:-1])
         return clingo.Function(name, [create_symbol(arg) for arg in args])
 
+def create_atom(rep, theory, positive):
+    if rep.type == clingo.TheoryTermType.Symbol:
+        return theory.add_formula(Atom("{}{}".format("" if positive else "-", rep), rep.name, [], positive))
+    elif rep.type == clingo.TheoryTermType.Function:
+        if rep.name == "-":
+            return create_atom(rep.arguments[0], theory, not positive)
+        elif rep.name not in _binary_operators and rep.name not in _unary_operators and rep.name not in _tel_operators:
+            return theory.add_formula(Atom("{}{}".format("" if positive else "-", rep), rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
+    raise RuntimeError("invalid atom: ".format(rep))
+
 def create_formula(rep, theory):
     if rep.type == clingo.TheoryTermType.Symbol:
-        return theory.add_formula(Atom(str(rep), rep.name, []))
+        return create_atom(rep, theory, True)
     elif rep.type == clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in _binary_operators:
@@ -288,14 +316,13 @@ def create_formula(rep, theory):
                 formula = theory.add_formula(TelFormulaN(str(rep), TelFormula.Trigger, lhs, rhs))
                 formula.set_future(theory.add_formula(Next("(>:{})".format(rep), formula, True)))
                 return formula
-            elif rep.name == ">?":
+            else:
+                assert(rep.name == ">?")
                 formula = theory.add_formula(TelFormulaN(str(rep), TelFormula.Since, lhs, rhs))
                 formula.set_future(theory.add_formula(Next("(>{})".format(rep), formula, False)))
                 return formula
-            else:
-                assert(False)
         else:
-            return theory.add_formula(Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments]))
+            return create_atom(rep, theory, True)
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
 

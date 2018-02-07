@@ -504,6 +504,7 @@ def transform(inputs, callback):
     clingo.parse_program(dedent('''\
         #theory tel {
             formula  {
+                -  : 4, unary; % classical negation
                 ~  : 4, unary; % negation
                 <  : 4, unary; % previous
                 <: : 4, unary; % weak previous
