@@ -350,11 +350,11 @@ class Theory:
 
     def translate(self, horizon, prg):
         for atom in prg.theory_atoms:
-            time    = atom.term.arguments[0].number
+            step    = atom.term.arguments[0].number
             rep     = atom.elements[0].terms[0]
             formula = create_formula(rep, self)
-            formula.add_atom(atom.literal, horizon)
-            self.add_todo(str(rep), formula, horizon)
+            formula.add_atom(atom.literal, step)
+            self.add_todo(str(rep), formula, step)
 
         if len(self.__todo) > 0:
             todo, self.__todo, self.__todo_keys = self.__todo, [], set()

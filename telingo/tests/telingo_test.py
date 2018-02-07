@@ -148,3 +148,5 @@ class TestMain(TestCase):
         self.assertEqual(solve("{-q}. :- not &tel{ -q }."), [['-q(0)']])
         self.assertEqual(solve("{-q(9)}. :- not &tel{ -q(9) }."), [['-q(9,0)']])
 
+    def test_future_tel(self):
+        self.assertEqual(solve("1 {p;q} 1. :- p', &tel { q }.", imin=2), [['p(0)'], ['p(0)', 'p(1)'], ['p(0)', 'q(1)'], ['q(0)'], ['q(0)', 'q(1)']])
