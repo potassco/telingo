@@ -50,6 +50,13 @@ The following temporal formulas are accepted in constraints and behind default
 negation between the braces of theory atoms of form `&tel { ... }` (see the
 second example below):
 
+- Boolean Formulas
+  - `a & b` (conjunction)
+  - `a | b` (disjunction)
+  - `a <- b` (left implication)
+  - `a -> b` (right implication)
+  - `a <> b` (equivalence)
+  - `~ a` (negation)
 - Formulas referring to the past
   - `< a` (previous)
   - `<: a` (weak previous)
