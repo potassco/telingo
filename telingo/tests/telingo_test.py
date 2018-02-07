@@ -70,7 +70,35 @@ class TestMain(TestCase):
     def test_theory_tel(self):
         self.assertRaisesRegex(RuntimeError, "leading primes", solve, ":- &tel {'p}.")
         self.assertRaisesRegex(RuntimeError, "trailing primes", solve, ":- &tel {p'}.")
-        # TODO: continue here...
-        #self.assertRegex(solve("{p}. :- __final,   not &tel {<p}."), [[]])
+        self.assertEqual(solve("{p}. :- __final, not &tel {<p}."), [['p(0)'], ['p(0)', 'p(1)']])
+        self.assertEqual(solve("{p}. :- __final, &tel {<:p}."), [[], ['p(1)']])
+        self.assertEqual(solve("{p}. :- __final, not &tel {<*p}.", imin=3), [['p(0)'], ['p(0)', 'p(1)'], ['p(0)', 'p(1)', 'p(2)']])
+        self.assertEqual(solve("q. {p}. :- __final, &tel {<?p}.", imin=3), [['q(0)'], ['q(0)', 'q(1)'], ['q(0)', 'q(1)', 'q(2)']])
+        self.assertEqual(solve("s. {q;p}. :- __final, not &tel { < s }. :- not &tel {p <* q}."), [
+            ['p(0)', 'p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(0)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['q(0)', 'q(1)', 's(0)', 's(1)']])
+        self.assertEqual(solve("s. {q;p}. :- __final, not &tel { < s }. :- __final, not &tel {p <* q}."), [
+            ['p(0)', 'p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(0)', 'p(1)', 'q(1)', 's(0)', 's(1)'],
+            ['p(0)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(1)', 'q(1)', 's(0)', 's(1)'],
+            ['q(0)', 'q(1)', 's(0)', 's(1)']])
+        self.assertEqual(solve("s. {q;p}. :- &tel {(~p) <* (~q)}."), [
+            ['p(0)', 'q(0)', 's(0)'],
+            ['q(0)', 's(0)']])
+        models = solve("""\
+            s.
+            {q;p}.
+            #program final.
+            :- not &tel { < s }.
+            #program initial.
+            :- not q.
+            :- not q', not p'.
+            :- not q', not q.
+            """)
+        self.assertEqual(models, solve("s. {q;p}. :- __final, not &tel { < s }. :- &tel {(~p) <* (~q)}."))
+        self.assertEqual(models, solve("s. {q;p}. :- __final, not &tel { < s }. :- not &tel {p <? q}."))
         #self.assertEqual(solve("{p}. :- __initial, not &tel {>p}."), [[]])
-

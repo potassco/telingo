@@ -8,6 +8,11 @@ def make_equal(backend, a, b):
     backend.add_rule([], [ a, -b])
     backend.add_rule([], [-a,  b])
 
+def make_disjunction(backend, e, a, b):
+    backend.add_rule([], [ e, -a, -b])
+    backend.add_rule([], [-e, a])
+    backend.add_rule([], [-e, b])
+
 class StepData:
     def __init__(self):
         self.literal  = None
@@ -72,38 +77,12 @@ class Atom(Formula):
         self.__arguments = arguments
 
     def do_translate(self, ctx, step, data):
-        assert(data.literal is None)
-        assert(step in range(0, ctx.horizon + 1))
-        # TODO: can be build so that step in [0, horizon]
-        if step < 0:
-            assert(False and "untested")
-            if data.literal is None:
-                data.literal = ctx.false_literal
-            return
-
-        sym = clingo.Function(self.__name, self.__arguments + [step])
-        # the atom has not yet been translated
+        # TODO: does not support classical negation for now...
         if data.literal is None:
-            # the atom refers to the future and is added as an external
-            if step > ctx.horizon:
-                assert(False and "untested")
-                data.literal = ctx.backend.add_atom(sym, step)
-                ctx.backend.add_external(data.literal, clingo.TruthValue._False)
-                ctx.add_todo(self._rep, self, step)
-            # the atom is already defined or won't be defined anymore
-            else:
-                sym_atom = ctx.symbols[sym]
-                data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
-        # the atom has already been translated
-        else:
-            # the atom refers to the future and has to be released later
-            if step > ctx.horizon:
-                assert(False and "untested")
-                ctx.add_todo(self._rep, self, step)
-            # the atom has to be released because it was either defined or won't be defined anymore
-            if data.literal != ctx.false_literal:
-                assert(False and "untested")
-                ctx.backend.add_external(data.literal, clingo.TruthValue.Release)
+            assert(step in range(0, ctx.horizon + 1))
+            sym = clingo.Function(self.__name, self.__arguments + [step])
+            sym_atom = ctx.symbols[sym]
+            data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
 class BooleanBinary(Formula):
     And = 0
@@ -130,9 +109,7 @@ class BooleanBinary(Formula):
                     rhs = -rhs
                 elif self.__operator == BooleanBinary.Ri:
                     lhs = -lhs
-                ctx.backend.add_rule([], [ lit, -rhs, -lhs])
-                ctx.backend.add_rule([], [-lit, rhs])
-                ctx.backend.add_rule([], [-lit, lhs])
+                make_disjunction(ctx.backend, lit, lhs, rhs)
             elif self.__operator == BooleanBinary.Eq:
                 ctx.backend.add_rule([], [ lit,  rhs,  lhs])
                 ctx.backend.add_rule([], [ lit, -rhs, -lhs])
@@ -148,6 +125,96 @@ class Negation(Formula):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
+
+class Previous(Formula):
+    def __init__(self, rep, arg, weak):
+        Formula.__init__(self, rep)
+        self.__arg  = arg
+        self.__weak = weak
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step > 0:
+                data.literal = self.__arg.translate(ctx, step-1)
+            else:
+                data.literal = ctx.false_literal
+                if self.__weak and step == 0:
+                    data.literal = -data.literal
+
+class AlwaysP(Formula):
+    def __init__(self, rep, arg):
+        Formula.__init__(self, rep)
+        self.__arg  = arg
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step == 0:
+                data.literal = self.__arg.translate(ctx, step)
+            else:
+                pre = self.translate(ctx, step - 1)
+                lhs = self.__arg.translate(ctx, step)
+                lit = data.literal = data.add_literal(ctx.backend)
+                make_disjunction(ctx.backend, -lit, -pre, -lhs)
+
+class SinceP(Formula):
+    def __init__(self, rep, lhs, rhs):
+        Formula.__init__(self, rep)
+        self.__lhs  = lhs
+        self.__rhs  = rhs
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step == 0:
+                data.literal = self.__rhs.translate(ctx, step)
+            else:
+                pre = self.translate(ctx, step - 1)
+                lhs = self.__lhs.translate(ctx, step)
+                rhs = self.__rhs.translate(ctx, step)
+                lit = data.literal = data.add_literal(ctx.backend)
+                ctx.backend.add_rule([], [-lit, rhs])
+                ctx.backend.add_rule([], [-lit, lhs, pre])
+                ctx.backend.add_rule([], [-rhs, -lhs, lit])
+                ctx.backend.add_rule([], [-rhs, -pre, lit])
+
+class EventuallyP(Formula):
+    def __init__(self, rep, arg):
+        Formula.__init__(self, rep)
+        self.__arg  = arg
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step == 0:
+                data.literal = self.__arg.translate(ctx, step)
+            else:
+                pre = self.translate(ctx, step - 1)
+                lhs = self.__arg.translate(ctx, step)
+                lit = data.literal = data.add_literal(ctx.backend)
+                make_disjunction(ctx.backend, lit, pre, lhs)
+
+class TriggerP(Formula):
+    def __init__(self, rep, lhs, rhs):
+        Formula.__init__(self, rep)
+        self.__lhs  = lhs
+        self.__rhs  = rhs
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step == 0:
+                data.literal = self.__rhs.translate(ctx, step)
+            else:
+                pre = self.translate(ctx, step - 1)
+                lhs = self.__lhs.translate(ctx, step)
+                rhs = self.__rhs.translate(ctx, step)
+                lit = data.literal = data.add_literal(ctx.backend)
+                ctx.backend.add_rule([], [lit, -rhs])
+                ctx.backend.add_rule([], [lit, -lhs, -pre])
+                ctx.backend.add_rule([], [rhs, lhs, -lit])
+                ctx.backend.add_rule([], [rhs, pre, -lit])
 
 _binary_operators = {
     "&": BooleanBinary.And,
@@ -179,24 +246,40 @@ def create_symbol(rep):
                 return clingo.String(name[1:-1])
         return clingo.Function(name, [create_symbol(arg) for arg in args])
 
-def create_formula(rep, formulas, step):
+def create_formula(rep, formulas):
     if rep.type == clingo.TheoryTermType.Symbol:
         formula = Atom(str(rep), rep.name, [])
     elif rep.type == clingo.TheoryTermType.Function:
+        args = rep.arguments
         if rep.name in _binary_operators:
-            lhs = create_formula(rep.arguments[0], formulas, step)
-            rhs = create_formula(rep.arguments[1], formulas, step)
+            lhs = create_formula(args[0], formulas)
+            rhs = create_formula(args[1], formulas)
             formula = BooleanBinary(str(rep), _binary_operators[rep.name], lhs, rhs)
         elif rep.name in _unary_operators:
-            arg = create_formula(rep.arguments[0], formulas, step)
+            arg = create_formula(args[0], formulas)
             formula = Negation(str(rep), arg)
         elif rep.name in _tel_operators:
-            assert(False and "implement me!!!")
+            lhs = create_formula(args[0], formulas)
+            rhs = None if len(args) == 1 else create_formula(args[1], formulas)
+            if rep.name == "<" or rep.name == "<:":
+                formula = Previous(str(rep), lhs, rep.name == "<:")
+            elif rep.name == "<*":
+                if len(args) == 1:
+                    formula = AlwaysP(str(rep), lhs)
+                else:
+                    formula = TriggerP(str(rep), lhs, rhs)
+            elif rep.name == "<?":
+                if len(args) == 1:
+                    formula = EventuallyP(str(rep), lhs)
+                else:
+                    formula = SinceP(str(rep), lhs, rhs)
+            else:
+                assert(False and "implement me!!!")
         else:
             formula = Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments])
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
-    formula = formulas.add_formula(str(rep), formula, step)
+    formula = formulas.add_formula(str(rep), formula)
     return formula
 
 class Formulas:
@@ -206,7 +289,7 @@ class Formulas:
         self.__todo = []
         self.__false_literal = None
 
-    def add_formula(self, key, formula, step):
+    def add_formula(self, key, formula):
         formula = self.__formulas.setdefault(key, formula)
         return formula
 
@@ -225,7 +308,7 @@ class Formulas:
         for atom in prg.theory_atoms:
             time    = atom.term.arguments[0].number
             rep     = atom.elements[0].terms[0]
-            formula = create_formula(rep, self, horizon)
+            formula = create_formula(rep, self)
             formula.add_atom(atom.literal, horizon)
             self.add_todo(str(rep), formula, horizon)
 
