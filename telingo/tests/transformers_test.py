@@ -37,15 +37,17 @@ class TestTermTransformer(TestCase):
         self.assertEqual(transform_term("''p'(X,Y)"), ("p(X,Y,(__t+-1))", set(), 0))
 
     def test_replace_future(self):
+        self.assertEqual(transform_term("-p", True), ("-p(__t)", set(), 0))
         self.assertEqual(transform_term("p", True), ("p(__t)", set(), 0))
         self.assertEqual(transform_term("p'p", True), ("p'p(__t)", set(), 0))
         self.assertEqual(transform_term("'p", True), ("p((__t+-1))", set(), 0))
         self.assertEqual(transform_term("''p", True), ("p((__t+-2))", set(), 0))
-        self.assertEqual(transform_term("p'", True), ("__future_p(1,(__t+1))", set([('p', 0, 1)]), 0))
-        self.assertEqual(transform_term("p''", True), ("__future_p(2,(__t+2))", set([('p', 0, 2)]), 0))
-        self.assertEqual(transform_term("'p''", True), ("__future_p(1,(__t+1))", set([('p', 0, 1)]), 0))
+        self.assertEqual(transform_term("p'", True), ("__future_p(1,(__t+1))", set([('p', 0, True, 1)]), 0))
+        self.assertEqual(transform_term("p''", True), ("__future_p(2,(__t+2))", set([('p', 0, True, 2)]), 0))
+        self.assertEqual(transform_term("'p''", True), ("__future_p(1,(__t+1))", set([('p', 0, True, 1)]), 0))
         self.assertEqual(transform_term("''p'", True), ("p((__t+-1))", set(), 0))
-        self.assertEqual(transform_term("p'(X,Y)", True), ("__future_p(X,Y,1,(__t+1))", set([('p', 2, 1)]), 0))
+        self.assertEqual(transform_term("p'(X,Y)", True), ("__future_p(X,Y,1,(__t+1))", set([('p', 2, True, 1)]), 0))
+        self.assertEqual(transform_term("-p'(X,Y)", True), ("-__future_p(X,Y,1,(__t+1))", set([('p', 2, False, 1)]), 0))
 
     def test_fail(self):
         self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_term, "'p", fail_past=True)
@@ -99,7 +101,7 @@ class TestProgramTransformer(TestCase):
         # simple rules
         self.assertEqual(transform_program("p."), (['#program always(__t,__u).', 'p(__t).'], set(), {}))
         self.assertEqual(transform_program("p :- 'p."), (['#program always(__t,__u).', 'p(__t) :- p((__t+-1)).'], set(), {}))
-        self.assertEqual(transform_program("p'."), (['#program always(__t,__u).', '__future_p(1,(__t+1)).'], set([('p', 0, 1)]), {}))
+        self.assertEqual(transform_program("p'."), (['#program always(__t,__u).', '__future_p(1,(__t+1)).'], set([('p', 0, True, 1)]), {}))
         self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_program, "'p.")
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p :- p'.")
         # body aggregates
@@ -172,7 +174,7 @@ class TestTransform(unittest.TestCase):
              '__future_p(1,(__t+1)).',
              '#program always(__t,__u).',
              'p(__t) :- __future_p(1,__t).'] + TestTransform.static,
-            [('__future_p', 2)], TestTransform.parts))
+            [('__future_p', 2, True)], TestTransform.parts))
         self.assertEqual(transform("p(X)|q."), (
             ['#program always(__t,__u).',
              'q(__t) : ; p(X,__t) : .'] + TestTransform.static,

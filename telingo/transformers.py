@@ -38,7 +38,7 @@ with auxiliary rules
   #program always(t).
   p(t) :- f_p(1,t).
 
-and future signatures [('f_p', 2)] whose atoms have to be set to False if
+and future signatures [('f_p', 2, True)] whose atoms have to be set to False if
 referring to the future.
 
 Handling of constraints referring to the future
@@ -146,9 +146,10 @@ class TermTransformer(Transformer):
     Members:
     parameter         -- Time parameter to extend atoms with.
     future_predicates -- Reference to the set of future predicates
-                         having type '{(name, arity, shift)}'
+                         having type '{(name, arity, positive, shift)}'
                          where shift corresponds to the number of next
-                         operators.
+                         operators and positive whether the literal is
+                         positive.
     """
     def __init__(self, future_predicates):
         """
@@ -156,6 +157,7 @@ class TermTransformer(Transformer):
         future_predicates -- reference to the map of future predicates
         """
         self.__future_predicates = future_predicates
+        self.__positive = True
 
     def __get_param(self, name, arity, location, replace_future, fail_future, fail_past, max_shift):
         """
@@ -213,13 +215,24 @@ class TermTransformer(Transformer):
                 raise RuntimeError("past atoms not supported in this context: {}".format(str_location(location)))
             if shift > 0:
                 if replace_future:
-                    self.__future_predicates.add((n, arity, shift))
+                    self.__future_predicates.add((n, arity, self.__positive, shift))
                     n = _future_prefix + n
                     params.insert(0, clingo.ast.Symbol(location, shift))
                 else:
                     max_shift[0] = max(max_shift[0], shift)
             params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Plus, params[-1], clingo.ast.Symbol(location, shift))
         return (n, params)
+
+    def visit_UnaryOperation(self, term, *args, **kwargs):
+        """
+        Determins classical negation.
+        """
+        try:
+            self.__positive = not self.__positive
+            return self.visit_children(term, *args, **kwargs)
+        finally:
+            self.__positive = not self.__positive
+        return term
 
     def visit_Function(self, term, *args, **kwargs):
         """
@@ -457,14 +470,15 @@ def transform(inputs, callback):
     future_sigs = []
     if len(future_predicates) > 0:
         callback(ast.Program(loc, "always", [ast.Id(loc, _time_parameter_name), ast.Id(loc, _time_parameter_name_alt)]))
-        for name, arity, shift in sorted(future_predicates):
+        for name, arity, positive, shift in sorted(future_predicates):
             variables = [ ast.Variable(loc, "{}{}".format(_variable_prefix, i)) for i in range(arity) ]
             s = ast.Symbol(loc, clingo.Number(shift))
             t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, time, s)
-            p_current = ast.SymbolicAtom(ast.Function(loc, name, variables + [time], False))
-            f_current =  ast.SymbolicAtom(ast.Function(loc, _future_prefix + name, variables + [s, time], False))
+            add_sign = lambda lit: lit if positive else ast.UnaryOperation(loc, ast.UnaryOperator.Minus, lit)
+            p_current = ast.SymbolicAtom(add_sign(ast.Function(loc, name, variables + [time], False)))
+            f_current =  ast.SymbolicAtom(add_sign(ast.Function(loc, _future_prefix + name, variables + [s, time], False)))
             callback(ast.Rule(loc, wrap_lit(p_current), [wrap_lit(f_current)]))
-            future_sigs.append((_future_prefix + name, arity + 2))
+            future_sigs.append((_future_prefix + name, arity + 2, positive))
 
     # gather rules for constraints referring to the future
     reground_parts = []

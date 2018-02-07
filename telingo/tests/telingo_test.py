@@ -45,6 +45,7 @@ class TestMain(TestCase):
         self.assertEqual(solve("p'."), [])
         self.assertEqual(solve("p' :- q. {q}."), [[]])
         self.assertEqual(solve("p' :- q. {q}. :- not q, __initial."), [['p(1)', 'q(0)']])
+        self.assertEqual(solve("-p' :- q. {p}. {q}. :- not q, __initial."), [['p(0)', 'q(0)', '-p(1)'], ['q(0)', '-p(1)']])
         self.assertEqual(solve("p'(1;2,3) :- __initial."), [['p(1,1)', 'p(2,3,1)']])
 
     def test_constraint(self):
