@@ -6,7 +6,7 @@ programs.
 import sys
 import clingo
 import telingo.transformers as transformers
-import telingo.formulas as formulas
+import telingo.theory as theory
 from textwrap import dedent
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
@@ -36,7 +36,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
     """
-    f = formulas.Formulas()
+    f = theory.Theory()
     step, ret = 0, None
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (

@@ -282,7 +282,7 @@ def create_formula(rep, formulas):
     formula = formulas.add_formula(str(rep), formula)
     return formula
 
-class Formulas:
+class Theory:
     def __init__(self):
         self.__formulas = {}
         self.__todo_keys = set()
