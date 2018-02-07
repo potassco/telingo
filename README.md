@@ -9,7 +9,7 @@ telingo --help
 telingo examples/example1.lp
 ```
 
-To use `telingo` directly form source run `python -m telingo` from the
+To use `telingo` directly from source run `python -m telingo` from the
 project's root directory.
 
 # Installation
@@ -137,6 +137,8 @@ unloaded.
 ```
 
 Output:
+
+```
 Solving...
 Solving...
 Solving...
@@ -161,3 +163,4 @@ Answer: 1
   loaded
   shoot
 SATISFIABLE
+```
