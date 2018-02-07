@@ -10,20 +10,23 @@ class TestCase(unittest.TestCase):
             if sys.version_info[0] < 3
             else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
 
-def parse_model(m):
+def parse_model(m, s, dual):
     ret = []
     for sym in m.symbols(shown=True):
         if not sym.name.startswith("__"):
             ret.append(sym)
+    if dual:
+        flip = lambda sym: clingo.Function(sym.name, sym.arguments[:-1] + [s - sym.arguments[-1].number], sym.positive)
+        ret = [flip(sym) for sym in ret]
     return list(map(str, sorted(ret)))
 
-def solve(s, imin=0):
+def solve(s, imin=0, dual=False):
     r = []
     imax  = 20
     prg = clingo.Control(['0'], message_limit=0)
     with prg.builder() as b:
         future_sigs, reground_parts = transformers.transform([s], b.add)
-    telingo.imain(prg, future_sigs, reground_parts, lambda m, s: r.append(parse_model(m)), imax = 20, imin=imin)
+    telingo.imain(prg, future_sigs, reground_parts, lambda m, s: r.append(parse_model(m, s, dual)), imax=20, imin=imin)
     return sorted(r)
 
 class TestMain(TestCase):
@@ -112,10 +115,30 @@ class TestMain(TestCase):
         self.assertEqual(solve("s. {p}. #program initial. :- not &tel {>* p}.", imin=3), [['p(0)', 'p(1)', 'p(2)', 's(0)', 's(1)', 's(2)'], ['p(0)', 'p(1)', 's(0)', 's(1)'], ['p(0)', 's(0)']])
         self.assertEqual(solve("s. {p}. #program initial. :- &tel {>? p}.", imin=3), [['s(0)'], ['s(0)', 's(1)'], ['s(0)', 's(1)', 's(2)']])
         self.assertEqual(solve("q. {p}. :- __initial, &tel {>?p}.", imin=3), [['q(0)'], ['q(0)', 'q(1)'], ['q(0)', 'q(1)', 'q(2)']])
+        self.assertEqual(solve("s. {q;p}. :- __final, not &tel { < s }. :- __initial, &tel {p >? q}."), [
+            ['p(0)', 'p(1)', 's(0)', 's(1)'],
+            ['p(0)', 's(0)', 's(1)'],
+            ['p(1)', 'q(1)', 's(0)', 's(1)'],
+            ['p(1)', 's(0)', 's(1)'],
+            ['q(1)', 's(0)', 's(1)'],
+            ['s(0)', 's(1)']])
+        self.assertEqual(solve("s. {q;p}. :- __final, not &tel { < s }. :- __initial, not &tel {p >* q}."), [
+            ['p(0)', 'p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(0)', 'p(1)', 'q(0)', 's(0)', 's(1)'],
+            ['p(0)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['p(0)', 'q(0)', 's(0)', 's(1)'],
+            ['p(1)', 'q(0)', 'q(1)', 's(0)', 's(1)'],
+            ['q(0)', 'q(1)', 's(0)', 's(1)']])
 
     def test_theory_tel_prop(self):
         self.assertEqual(solve("q. {p}. :- __initial, &tel {>?p}.", imin=3), solve("q. {p}. :- __final, &tel {<?p}.", imin=3))
         self.assertEqual(solve("q. {p}. :- __initial, not &tel {>?p}.", imin=3), solve("q. {p}. :- __final, not &tel {<?p}.", imin=3))
         self.assertEqual(solve("q. {p}. :- __initial, &tel {>*p}.", imin=3), solve("q. {p}. :- __final, &tel {<*p}.", imin=3))
         self.assertEqual(solve("q. {p}. :- __initial, not &tel {>*p}.", imin=3), solve("q. {p}. :- __final, not &tel {<*p}.", imin=3))
+        self.assertEqual(solve("s. {p;q}. :- __initial, &tel {p>?q}.", imin=2), solve("s. {p;q}. :- __final, &tel {p<?q}.", imin=2, dual=True))
+        self.assertEqual(solve("s. {p;q}. :- __initial, &tel {p>*q}.", imin=2), solve("s. {p;q}. :- __final, &tel {p<*q}.", imin=2, dual=True))
+        self.assertEqual(solve("s. {p;q;r}. :- __initial, &tel {p>*(q>?r)}.", imin=2), solve("s. {p;q;r}. :- __final, &tel {p<*(q<?r)}.", imin=2, dual=True))
+        self.assertEqual(solve("s. {p;q;r}. :- &tel {p>*(q>?r)}.", imin=2), solve("s. {p;q;r}. :- &tel {p<*(q<?r)}.", imin=2, dual=True))
+        self.assertEqual(solve("s. {p;q;r}. :- &tel {p>*(q<?r)}.", imin=2), solve("s. {p;q;r}. :- &tel {p<*(q>?r)}.", imin=2, dual=True))
+        self.assertEqual(solve("s. {p;q;r}. :- &tel {p<*(q>?r)}.", imin=2), solve("s. {p;q;r}. :- &tel {p>*(q<?r)}.", imin=2, dual=True))
 

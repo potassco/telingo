@@ -90,12 +90,23 @@ class Atom(Formula):
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
-class BooleanBinary(Formula):
+class Negation(Formula):
+    def __init__(self, rep, arg):
+        Formula.__init__(self, rep)
+        self.__arg = arg
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            data.literal = -self.__arg.translate(ctx, step)
+
+class BooleanFormula(Formula):
     And = 0
     Or  = 1
     Eq  = 2
     Li  = 3
     Ri  = 4
+
     def __init__(self, rep, operator, lhs, rhs):
         Formula.__init__(self, rep)
         self.__operator = operator
@@ -108,31 +119,21 @@ class BooleanBinary(Formula):
             lhs = self.__lhs.translate(ctx, step)
             rhs = self.__rhs.translate(ctx, step)
             lit = data.add_literal(ctx.backend)
-            if self.__operator != BooleanBinary.Eq:
-                if self.__operator == BooleanBinary.And:
+            if self.__operator != BooleanFormula.Eq:
+                if self.__operator == BooleanFormula.And:
                     lit, lhs, rhs = -lit, -lhs, -rhs
-                elif self.__operator == BooleanBinary.Li:
+                elif self.__operator == BooleanFormula.Li:
                     rhs = -rhs
-                elif self.__operator == BooleanBinary.Ri:
+                elif self.__operator == BooleanFormula.Ri:
                     lhs = -lhs
                 make_disjunction(ctx.backend, lit, lhs, rhs)
-            elif self.__operator == BooleanBinary.Eq:
+            elif self.__operator == BooleanFormula.Eq:
                 ctx.backend.add_rule([], [ lit,  rhs,  lhs])
                 ctx.backend.add_rule([], [ lit, -rhs, -lhs])
                 ctx.backend.add_rule([], [-lit,  rhs, -lhs])
                 ctx.backend.add_rule([], [-lit, -rhs,  lhs])
 
-class Negation(Formula):
-    def __init__(self, rep, arg):
-        Formula.__init__(self, rep)
-        self.__arg = arg
-
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            data.literal = -self.__arg.translate(ctx, step)
-
-# Past Formulas {{{1
+# Temporal Formulas {{{1
 
 class Previous(Formula):
     def __init__(self, rep, arg, weak):
@@ -149,40 +150,6 @@ class Previous(Formula):
                 data.literal = ctx.false_literal
                 if self.__weak and step == 0:
                     data.literal = -data.literal
-
-class TelP(Formula):
-    Since   = 0
-    Trigger = 1
-
-    def __init__(self, rep, op, lhs, rhs):
-        Formula.__init__(self, rep)
-        self.__op  = op
-        self.__lhs = lhs
-        self.__rhs = rhs
-
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            if step == 0:
-                data.literal = self.__rhs.translate(ctx, step)
-            else:
-                pre = self.translate(ctx, step - 1)
-                lhs = None if self.__lhs is None else self.__lhs.translate(ctx, step)
-                rhs = self.__rhs.translate(ctx, step)
-                lit = data.add_literal(ctx.backend)
-                if self.__op == TelP.Trigger:
-                    lit, rhs, pre = -lit, -rhs, -pre
-                    if lhs is not None:
-                        lhs = - lhs
-                ctx.backend.add_rule([], [-lit, rhs])
-                ctx.backend.add_rule([], [-rhs, -pre, lit])
-                if lhs is not None:
-                    ctx.backend.add_rule([], [-lit,  lhs, pre])
-                    ctx.backend.add_rule([], [-rhs, -lhs, lit])
-                else:
-                    ctx.backend.add_rule([], [-lit, pre])
-
-# Future Formulas {{{1
 
 class Next(Formula):
     def __init__(self, rep, arg, weak):
@@ -208,10 +175,49 @@ class Next(Formula):
             ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
             data.done = True
 
-class AlwaysN(Formula):
-    def __init__(self, rep, rhs):
+class TelFormula(Formula):
+    Since   = 0
+    Trigger = 1
+
+    def __init__(self, rep, op, lhs, rhs):
         Formula.__init__(self, rep)
-        self.__rhs    = rhs
+        self._op  = op
+        self._lhs = lhs
+        self._rhs = rhs
+
+    def _translate(self, ctx, step, data, pre):
+        lhs = None if self._lhs is None else self._lhs.translate(ctx, step)
+        rhs = self._rhs.translate(ctx, step)
+        lit = data.add_literal(ctx.backend)
+        if self._op == TelFormulaP.Trigger:
+            lit, rhs, pre = -lit, -rhs, -pre
+            if lhs is not None:
+                lhs = -lhs
+        ctx.backend.add_rule([], [-lit, rhs])
+        ctx.backend.add_rule([], [-rhs, -pre, lit])
+        if lhs is not None:
+            ctx.backend.add_rule([], [-lit,  lhs, pre])
+            ctx.backend.add_rule([], [-rhs, -lhs, lit])
+        else:
+            ctx.backend.add_rule([], [-lit, pre])
+
+
+class TelFormulaP(TelFormula):
+    def __init__(self, rep, op, lhs, rhs):
+        TelFormula.__init__(self, rep, op, lhs, rhs)
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step == 0:
+                data.literal = self._rhs.translate(ctx, step)
+            else:
+                pre = self.translate(ctx, step - 1)
+                self._translate(ctx, step, data, pre)
+
+class TelFormulaN(TelFormula):
+    def __init__(self, rep, op, lhs, rhs):
+        TelFormula.__init__(self, rep, op, lhs, rhs)
         self.__future = None
 
     def set_future(self, future):
@@ -220,36 +226,17 @@ class AlwaysN(Formula):
     def do_translate(self, ctx, step, data):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            lit = data.add_literal(ctx.backend)
-            rhs = self.__rhs.translate(ctx, step)
             fut = self.__future.translate(ctx, step)
-            make_disjunction(ctx.backend, -lit, -rhs, -fut)
-
-class EventuallyN(Formula):
-    def __init__(self, rep, rhs):
-        Formula.__init__(self, rep)
-        self.__rhs    = rhs
-        self.__future = None
-
-    def set_future(self, future):
-        self.__future = future
-
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            lit = data.add_literal(ctx.backend)
-            rhs = self.__rhs.translate(ctx, step)
-            fut = self.__future.translate(ctx, step)
-            make_disjunction(ctx.backend, lit, rhs, fut)
+            self._translate(ctx, step, data, fut)
 
 # Theory of Formulas {{{1
 
 _binary_operators = {
-    "&": BooleanBinary.And,
-    "|": BooleanBinary.Or,
-    "<>": BooleanBinary.Eq,
-    "<-": BooleanBinary.Li,
-    "->": BooleanBinary.Ri}
+    "&": BooleanFormula.And,
+    "|": BooleanFormula.Or,
+    "<>": BooleanFormula.Eq,
+    "<-": BooleanFormula.Li,
+    "->": BooleanFormula.Ri}
 
 _unary_operators = {"~"}
 
@@ -274,43 +261,43 @@ def create_symbol(rep):
                 return clingo.String(name[1:-1])
         return clingo.Function(name, [create_symbol(arg) for arg in args])
 
-def create_formula(rep, formulas):
+def create_formula(rep, theory):
     if rep.type == clingo.TheoryTermType.Symbol:
-        formula = Atom(str(rep), rep.name, [])
+        return theory.add_formula(Atom(str(rep), rep.name, []))
     elif rep.type == clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in _binary_operators:
-            lhs = create_formula(args[0], formulas)
-            rhs = create_formula(args[1], formulas)
-            formula = BooleanBinary(str(rep), _binary_operators[rep.name], lhs, rhs)
+            lhs = create_formula(args[0], theory)
+            rhs = create_formula(args[1], theory)
+            return theory.add_formula(BooleanFormula(str(rep), _binary_operators[rep.name], lhs, rhs))
         elif rep.name in _unary_operators:
-            arg = create_formula(args[0], formulas)
-            formula = Negation(str(rep), arg)
+            arg = create_formula(args[0], theory)
+            return theory.add_formula(Negation(str(rep), arg))
         elif rep.name in _tel_operators:
-            lhs = None if len(args) == 1 else create_formula(args[0], formulas)
-            rhs = create_formula(args[-1], formulas)
+            lhs = None if len(args) == 1 else create_formula(args[0], theory)
+            rhs = create_formula(args[-1], theory)
             if rep.name == "<" or rep.name == "<:":
-                formula = Previous(str(rep), rhs, rep.name == "<:")
+                return theory.add_formula(Previous(str(rep), rhs, rep.name == "<:"))
             elif rep.name == "<*":
-                formula = TelP(str(rep), TelP.Trigger, lhs, rhs)
+                return theory.add_formula(TelFormulaP(str(rep), TelFormula.Trigger, lhs, rhs))
             elif rep.name == "<?":
-                formula = TelP(str(rep), TelP.Since, lhs, rhs)
+                return theory.add_formula(TelFormulaP(str(rep), TelFormula.Since, lhs, rhs))
             elif rep.name == ">" or rep.name == ">:":
-                formula = Next(str(rep), rhs, rep.name == ">:")
+                return theory.add_formula(Next(str(rep), rhs, rep.name == ">:"))
             elif rep.name == ">*":
-                formula = formulas.add_formula(AlwaysN(str(rep), rhs))
-                formula.set_future(formulas.add_formula(Next("(>:{})".format(rep), formula, True)))
+                formula = theory.add_formula(TelFormulaN(str(rep), TelFormula.Trigger, lhs, rhs))
+                formula.set_future(theory.add_formula(Next("(>:{})".format(rep), formula, True)))
+                return formula
             elif rep.name == ">?":
-                formula = formulas.add_formula(EventuallyN(str(rep), rhs))
-                formula.set_future(formulas.add_formula(Next("(>:{})".format(rep), formula, False)))
+                formula = theory.add_formula(TelFormulaN(str(rep), TelFormula.Since, lhs, rhs))
+                formula.set_future(theory.add_formula(Next("(>{})".format(rep), formula, False)))
+                return formula
             else:
-                assert(False and "implement me!!!")
+                assert(False)
         else:
-            formula = Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments])
+            return theory.add_formula(Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments]))
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
-    formula = formulas.add_formula(formula)
-    return formula
 
 class Theory:
     def __init__(self):
