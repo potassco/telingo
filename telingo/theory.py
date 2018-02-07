@@ -142,27 +142,15 @@ class Previous(Formula):
                 if self.__weak and step == 0:
                     data.literal = -data.literal
 
-class AlwaysP(Formula):
-    def __init__(self, rep, arg):
-        Formula.__init__(self, rep)
-        self.__arg  = arg
+class TelP(Formula):
+    Since   = 0
+    Trigger = 1
 
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            if step == 0:
-                data.literal = self.__arg.translate(ctx, step)
-            else:
-                pre = self.translate(ctx, step - 1)
-                lhs = self.__arg.translate(ctx, step)
-                lit = data.literal = data.add_literal(ctx.backend)
-                make_disjunction(ctx.backend, -lit, -pre, -lhs)
-
-class SinceP(Formula):
-    def __init__(self, rep, lhs, rhs):
+    def __init__(self, rep, op, lhs, rhs):
         Formula.__init__(self, rep)
-        self.__lhs  = lhs
-        self.__rhs  = rhs
+        self.__op  = op
+        self.__lhs = lhs
+        self.__rhs = rhs
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
@@ -171,50 +159,20 @@ class SinceP(Formula):
                 data.literal = self.__rhs.translate(ctx, step)
             else:
                 pre = self.translate(ctx, step - 1)
-                lhs = self.__lhs.translate(ctx, step)
+                lhs = None if self.__lhs is None else self.__lhs.translate(ctx, step)
                 rhs = self.__rhs.translate(ctx, step)
                 lit = data.literal = data.add_literal(ctx.backend)
+                if self.__op == TelP.Trigger:
+                    lit, rhs, pre = -lit, -rhs, -pre
+                    if lhs is not None:
+                        lhs = - lhs
                 ctx.backend.add_rule([], [-lit, rhs])
-                ctx.backend.add_rule([], [-lit, lhs, pre])
-                ctx.backend.add_rule([], [-rhs, -lhs, lit])
                 ctx.backend.add_rule([], [-rhs, -pre, lit])
-
-class EventuallyP(Formula):
-    def __init__(self, rep, arg):
-        Formula.__init__(self, rep)
-        self.__arg  = arg
-
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            if step == 0:
-                data.literal = self.__arg.translate(ctx, step)
-            else:
-                pre = self.translate(ctx, step - 1)
-                lhs = self.__arg.translate(ctx, step)
-                lit = data.literal = data.add_literal(ctx.backend)
-                make_disjunction(ctx.backend, lit, pre, lhs)
-
-class TriggerP(Formula):
-    def __init__(self, rep, lhs, rhs):
-        Formula.__init__(self, rep)
-        self.__lhs  = lhs
-        self.__rhs  = rhs
-
-    def do_translate(self, ctx, step, data):
-        if data.literal is None:
-            assert(step in range(0, ctx.horizon + 1))
-            if step == 0:
-                data.literal = self.__rhs.translate(ctx, step)
-            else:
-                pre = self.translate(ctx, step - 1)
-                lhs = self.__lhs.translate(ctx, step)
-                rhs = self.__rhs.translate(ctx, step)
-                lit = data.literal = data.add_literal(ctx.backend)
-                ctx.backend.add_rule([], [lit, -rhs])
-                ctx.backend.add_rule([], [lit, -lhs, -pre])
-                ctx.backend.add_rule([], [rhs, lhs, -lit])
-                ctx.backend.add_rule([], [rhs, pre, -lit])
+                if lhs is not None:
+                    ctx.backend.add_rule([], [-lit,  lhs, pre])
+                    ctx.backend.add_rule([], [-rhs, -lhs, lit])
+                else:
+                    ctx.backend.add_rule([], [-lit, pre])
 
 _binary_operators = {
     "&": BooleanBinary.And,
@@ -259,20 +217,14 @@ def create_formula(rep, formulas):
             arg = create_formula(args[0], formulas)
             formula = Negation(str(rep), arg)
         elif rep.name in _tel_operators:
-            lhs = create_formula(args[0], formulas)
-            rhs = None if len(args) == 1 else create_formula(args[1], formulas)
+            lhs = None if len(args) == 1 else create_formula(args[0], formulas)
+            rhs = create_formula(args[-1], formulas)
             if rep.name == "<" or rep.name == "<:":
-                formula = Previous(str(rep), lhs, rep.name == "<:")
+                formula = Previous(str(rep), rhs, rep.name == "<:")
             elif rep.name == "<*":
-                if len(args) == 1:
-                    formula = AlwaysP(str(rep), lhs)
-                else:
-                    formula = TriggerP(str(rep), lhs, rhs)
+                formula = TelP(str(rep), TelP.Trigger, lhs, rhs)
             elif rep.name == "<?":
-                if len(args) == 1:
-                    formula = EventuallyP(str(rep), lhs)
-                else:
-                    formula = SinceP(str(rep), lhs, rhs)
+                formula = TelP(str(rep), TelP.Since, lhs, rhs)
             else:
                 assert(False and "implement me!!!")
         else:
