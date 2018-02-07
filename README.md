@@ -46,7 +46,26 @@ The following program parts are accepted:
 - `#program dynamic.` which applies to all except the first state
 - `#program final.` which applies only to the last state
 
-## Example
+The following temporal formulas are accepted in constraints and behind default
+negation between the braces of theory atoms of form `&tel { ... }` (see the
+second example below):
+
+- Formulas referring to the past
+  - `< a` (previous)
+  - `<: a` (weak previous)
+  - `a <* b` (until)
+  - `<* b` (always before)
+  - `a <? b` (since)
+  - `<? b` (eventually before)
+- Formulas referring to the future
+  - `> a` (next)
+  - `>: a` (weak next)
+  - `a >* b` (release)
+  - `>* b` (always after)
+  - `a >? b` (until)
+  - `>? b` (eventually after)
+
+## Example I
 
 The following temporal program executes on of the `shoot`, `load`, or `wait`
 actions in each time step and updates the `loaded` and `unloaded` fluents
@@ -89,3 +108,56 @@ The output shows that two states have been unfolded on after the other. For the
 first answer, there was only one state, the initial situation, where the gun
 was unloaded. In the second answer, the second state has been unfolded and the
 gun been shot (even though unloaded).
+
+## Example II
+
+The following example modifies the above program to encode that the gun breaks
+if there were two shots without loading the gun. Furthermore, its last
+integrity constraint selects traces where the loaded gun does not shoot because
+it is broken.
+
+```
+#program dynamic.
+shoot | load | wait.
+
+loaded :- load.
+loaded :- 'loaded, not unloaded.
+unloaded :- shoot, 'loaded, not broken.
+unloaded :- 'unloaded, not loaded.
+
+:- load, 'loaded.
+
+broken :- shoot, not not &tel { <* unloaded & < <? shoot }.
+broken :- 'broken.
+
+#program initial.
+unloaded.
+
+:- &tel { >*(~loaded | ~shoot) }.
+```
+
+Output:
+Solving...
+Solving...
+Solving...
+Solving...
+Solving...
+Answer: 1
+ State 0:
+  unloaded
+ State 1:
+  shoot
+  unloaded
+ State 2:
+  broken
+  shoot
+  unloaded
+ State 3:
+  broken
+  load
+  loaded
+ State 4:
+  broken
+  loaded
+  shoot
+SATISFIABLE

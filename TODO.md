@@ -1,4 +1,3 @@
 - use of `&final`, `&false`, `&true`, `&initial` in `&tel { ... }`
 - use of `&final {}`, `&initial {}` in rule bodies/heads
 - overwrite text output partially
-- examples
