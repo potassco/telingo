@@ -3,6 +3,7 @@ TODO: document
 """
 
 import clingo
+import clingo.ast as ast
 
 # Base for Formulas {{{1
 
@@ -20,6 +21,7 @@ class StepData:
         self.literal  = None
         self.literals = set()
         self.todo     = []
+        self.done     = True
 
     def add_literal(self, backend):
         assert(self.literal is None)
@@ -105,7 +107,7 @@ class BooleanBinary(Formula):
             assert(step in range(0, ctx.horizon + 1))
             lhs = self.__lhs.translate(ctx, step)
             rhs = self.__rhs.translate(ctx, step)
-            lit = data.literal = data.add_literal(ctx.backend)
+            lit = data.add_literal(ctx.backend)
             if self.__operator != BooleanBinary.Eq:
                 if self.__operator == BooleanBinary.And:
                     lit, lhs, rhs = -lit, -lhs, -rhs
@@ -167,7 +169,7 @@ class TelP(Formula):
                 pre = self.translate(ctx, step - 1)
                 lhs = None if self.__lhs is None else self.__lhs.translate(ctx, step)
                 rhs = self.__rhs.translate(ctx, step)
-                lit = data.literal = data.add_literal(ctx.backend)
+                lit = data.add_literal(ctx.backend)
                 if self.__op == TelP.Trigger:
                     lit, rhs, pre = -lit, -rhs, -pre
                     if lhs is not None:
@@ -187,27 +189,58 @@ class Next(Formula):
         Formula.__init__(self, rep)
         self.__arg  = arg
         self.__weak = weak
-        # Think more: should be unnecessary
-        self.__todo = False
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step < ctx.horizon:
                 data.literal = self.__arg.translate(ctx, step+1)
-                self.__todo = False
+                data.done = True
             else:
                 data.literal = ctx.backend.add_atom()
                 ctx.backend.add_external(data.literal, clingo.TruthValue._True if self.__weak else clingo.TruthValue._False)
                 ctx.add_todo(self._rep, self, step)
-                self.__todo = True
-        elif self.__todo:
+                data.done = False
+        elif not data.done:
             assert(step in range(0, ctx.horizon))
             arg = self.__arg.translate(ctx, step+1)
             make_equal(ctx.backend, data.literal, arg)
             ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
-            self.__todo = False
+            data.done = True
 
+class AlwaysN(Formula):
+    def __init__(self, rep, rhs):
+        Formula.__init__(self, rep)
+        self.__rhs    = rhs
+        self.__future = None
+
+    def set_future(self, future):
+        self.__future = future
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            lit = data.add_literal(ctx.backend)
+            rhs = self.__rhs.translate(ctx, step)
+            fut = self.__future.translate(ctx, step)
+            make_disjunction(ctx.backend, -lit, -rhs, -fut)
+
+class EventuallyN(Formula):
+    def __init__(self, rep, rhs):
+        Formula.__init__(self, rep)
+        self.__rhs    = rhs
+        self.__future = None
+
+    def set_future(self, future):
+        self.__future = future
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            lit = data.add_literal(ctx.backend)
+            rhs = self.__rhs.translate(ctx, step)
+            fut = self.__future.translate(ctx, step)
+            make_disjunction(ctx.backend, lit, rhs, fut)
 
 # Theory of Formulas {{{1
 
@@ -264,13 +297,19 @@ def create_formula(rep, formulas):
                 formula = TelP(str(rep), TelP.Since, lhs, rhs)
             elif rep.name == ">" or rep.name == ">:":
                 formula = Next(str(rep), rhs, rep.name == ">:")
+            elif rep.name == ">*":
+                formula = formulas.add_formula(AlwaysN(str(rep), rhs))
+                formula.set_future(formulas.add_formula(Next("(>:{})".format(rep), formula, True)))
+            elif rep.name == ">?":
+                formula = formulas.add_formula(EventuallyN(str(rep), rhs))
+                formula.set_future(formulas.add_formula(Next("(>:{})".format(rep), formula, False)))
             else:
                 assert(False and "implement me!!!")
         else:
             formula = Atom(str(rep), rep.name, [create_symbol(arg) for arg in rep.arguments])
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
-    formula = formulas.add_formula(str(rep), formula)
+    formula = formulas.add_formula(formula)
     return formula
 
 class Theory:
@@ -280,8 +319,8 @@ class Theory:
         self.__todo = []
         self.__false_literal = None
 
-    def add_formula(self, key, formula):
-        formula = self.__formulas.setdefault(key, formula)
+    def add_formula(self, formula):
+        formula = self.__formulas.setdefault(formula._rep, formula)
         return formula
 
     def add_todo(self, key, formula, step):

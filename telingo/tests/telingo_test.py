@@ -108,3 +108,14 @@ class TestMain(TestCase):
     def test_theory_tel_future(self):
         self.assertEqual(solve("{p}. :- __initial, not &tel {>p}."), [['p(0)', 'p(1)'], ['p(1)']])
         self.assertEqual(solve("{p}. :- __initial, not &tel {> > p}."), [['p(0)', 'p(1)', 'p(2)'], ['p(0)', 'p(2)'], ['p(1)', 'p(2)'], ['p(2)']])
+        self.assertEqual(solve("{p}. #program initial. :- not &tel {> > p}."), [['p(0)', 'p(1)', 'p(2)'], ['p(0)', 'p(2)'], ['p(1)', 'p(2)'], ['p(2)']])
+        self.assertEqual(solve("s. {p}. #program initial. :- not &tel {>* p}.", imin=3), [['p(0)', 'p(1)', 'p(2)', 's(0)', 's(1)', 's(2)'], ['p(0)', 'p(1)', 's(0)', 's(1)'], ['p(0)', 's(0)']])
+        self.assertEqual(solve("s. {p}. #program initial. :- &tel {>? p}.", imin=3), [['s(0)'], ['s(0)', 's(1)'], ['s(0)', 's(1)', 's(2)']])
+        self.assertEqual(solve("q. {p}. :- __initial, &tel {>?p}.", imin=3), [['q(0)'], ['q(0)', 'q(1)'], ['q(0)', 'q(1)', 'q(2)']])
+
+    def test_theory_tel_prop(self):
+        self.assertEqual(solve("q. {p}. :- __initial, &tel {>?p}.", imin=3), solve("q. {p}. :- __final, &tel {<?p}.", imin=3))
+        self.assertEqual(solve("q. {p}. :- __initial, not &tel {>?p}.", imin=3), solve("q. {p}. :- __final, not &tel {<?p}.", imin=3))
+        self.assertEqual(solve("q. {p}. :- __initial, &tel {>*p}.", imin=3), solve("q. {p}. :- __final, &tel {<*p}.", imin=3))
+        self.assertEqual(solve("q. {p}. :- __initial, not &tel {>*p}.", imin=3), solve("q. {p}. :- __final, not &tel {<*p}.", imin=3))
+
