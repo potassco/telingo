@@ -4,6 +4,8 @@ TODO: document
 
 import clingo
 
+# Base for Formulas {{{1
+
 def make_equal(backend, a, b):
     backend.add_rule([], [ a, -b])
     backend.add_rule([], [-a,  b])
@@ -64,6 +66,8 @@ class Formula:
         if atom not in data.literals:
             data.literals.add(atom)
             data.todo.append(atom)
+
+# Boolean Formulas {{{1
 
 class Atom(Formula):
     def __init__(self, rep, name, arguments = []):
@@ -126,6 +130,8 @@ class Negation(Formula):
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
 
+# Past Formulas {{{1
+
 class Previous(Formula):
     def __init__(self, rep, arg, weak):
         Formula.__init__(self, rep)
@@ -173,6 +179,37 @@ class TelP(Formula):
                     ctx.backend.add_rule([], [-rhs, -lhs, lit])
                 else:
                     ctx.backend.add_rule([], [-lit, pre])
+
+# Future Formulas {{{1
+
+class Next(Formula):
+    def __init__(self, rep, arg, weak):
+        Formula.__init__(self, rep)
+        self.__arg  = arg
+        self.__weak = weak
+        # Think more: should be unnecessary
+        self.__todo = False
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            if step < ctx.horizon:
+                data.literal = self.__arg.translate(ctx, step+1)
+                self.__todo = False
+            else:
+                data.literal = ctx.backend.add_atom()
+                ctx.backend.add_external(data.literal, clingo.TruthValue._True if self.__weak else clingo.TruthValue._False)
+                ctx.add_todo(self._rep, self, step)
+                self.__todo = True
+        elif self.__todo:
+            assert(step in range(0, ctx.horizon))
+            arg = self.__arg.translate(ctx, step+1)
+            make_equal(ctx.backend, data.literal, arg)
+            ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
+            self.__todo = False
+
+
+# Theory of Formulas {{{1
 
 _binary_operators = {
     "&": BooleanBinary.And,
@@ -225,6 +262,8 @@ def create_formula(rep, formulas):
                 formula = TelP(str(rep), TelP.Trigger, lhs, rhs)
             elif rep.name == "<?":
                 formula = TelP(str(rep), TelP.Since, lhs, rhs)
+            elif rep.name == ">" or rep.name == ">:":
+                formula = Next(str(rep), rhs, rep.name == ">:")
             else:
                 assert(False and "implement me!!!")
         else:
