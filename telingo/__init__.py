@@ -83,32 +83,17 @@ class Application:
         self.__imin = 0
         self.__imax = None
         self.__istop = "SAT"
+        self.__horizon = 0
 
-    def __on_model(self, model, steps):
+    def __on_model(self, model, horizon):
         """
         Prints the atoms in a model grouped by state.
 
         Arguments:
         model -- The model to print.
-        steps -- The number of states.
+        horizon -- The number of states.
         """
-        table = {}
-        for sym in model.symbols(shown=True):
-            if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1]))
-        sys.stdout.write("Answer: {}\n".format(model.number))
-        for step in range(steps+1):
-            symbols = table.get(step, [])
-            sys.stdout.write(" State {}:".format(step))
-            sig = None
-            for sym in sorted(symbols):
-                if not sym.name.startswith('__'):
-                    if (sym.name, len(sym.arguments)) != sig:
-                        sys.stdout.write("\n ")
-                        sig = (sym.name, len(sym.arguments))
-                    sys.stdout.write(" {}".format(sym))
-            sys.stdout.write("\n".format(step))
-        return True
+        self.__horizon = horizon
 
     def __parse_imin(self, value):
         """
@@ -134,6 +119,24 @@ class Application:
         """
         self.__istop = value.upper()
         return self.__istop in ["SAT", "UNSAT", "UNKNOWN"]
+
+    def print_model(self, model, printer):
+        table = {}
+        for sym in model.symbols(shown=True):
+            if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
+                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1]))
+        for step in range(self.__horizon+1):
+            symbols = table.get(step, [])
+            sys.stdout.write(" State {}:".format(step))
+            sig = None
+            for sym in sorted(symbols):
+                if not sym.name.startswith('__'):
+                    if (sym.name, len(sym.arguments)) != sig:
+                        sys.stdout.write("\n ")
+                        sig = (sym.name, len(sym.arguments))
+                    sys.stdout.write(" {}".format(sym))
+            sys.stdout.write("\n".format(step))
+        return True
 
     def register_options(self, options):
         """
@@ -163,7 +166,6 @@ class Application:
 
 def main():
     """
-    TODO: it would be cool if it where possible to replace part of the output
+    Run the telingo application.
     """
-    ret = clingo.clingo_main(Application("telingo"), ["-q2"] + sys.argv[1:])
-    sys.exit(int(ret))
+    sys.exit(int(clingo.clingo_main(Application("telingo"), sys.argv[1:])))
