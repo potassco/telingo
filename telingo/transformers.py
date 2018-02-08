@@ -393,13 +393,30 @@ class ProgramTransformer(Transformer):
 
     def visit_TheoryAtom(self, atom):
         """
-        Rewrites theory atoms of form `&tel {...}` to `&tel(k) {...}.`
+        Rewrites theory atoms related to temporal formulas.
+
+        An atom of form `&tel {...}` is rewritten to `&tel(k) {...}`, atoms of
+        form `&initial` and `&final` are rewritten to `__initial` and
+        `__final`, and atoms of form `&true` and `&false` are rewritten to
+        `#true` and `#false`.
         """
-        if not self.__negation and not self.__constraint:
-            raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
-        if len(atom.elements) != 1 or len(atom.elements[0].condition):
-            raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
-        atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
+        if atom.term.type == ast.ASTType.Function and len(atom.term.arguments) == 0:
+            time = lambda loc: ast.Symbol(loc, clingo.Function(_time_parameter_name))
+            wrap = lambda loc, atom: ast.Literal(loc, ast.Sign.DoubleNegation, atom) if self.__head else atom
+            if atom.term.name == "tel" :
+                if not self.__negation and not self.__constraint:
+                    raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
+                if len(atom.elements) != 1 or len(atom.elements[0].condition):
+                    raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
+                atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
+            elif atom.term.name == "initial":
+                atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__initial", [time(atom.location)], False)))
+            elif atom.term.name == "final":
+                atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__final", [time(atom.location)], False)))
+            elif atom.term.name == "true":
+                atom = wrap(atom.location, ast.BooleanConstant(True))
+            elif atom.term.name == "false":
+                atom = wrap(atom.location, ast.BooleanConstant(False))
         return atom
 
     def visit_Program(self, prg):

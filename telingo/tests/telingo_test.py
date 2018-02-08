@@ -40,6 +40,12 @@ class TestMain(TestCase):
         self.assertEqual(solve("p : q. q."), [['p(0)', 'q(0)']])
         self.assertEqual(solve("r :- p : q. p. {q}."), [['p(0)', 'q(0)', 'r(0)'], ['p(0)', 'r(0)']])
         self.assertEqual(solve("r :- {p : q} >= 1. p. {q}."), [['p(0)'], ['p(0)', 'q(0)', 'r(0)']])
+        self.assertEqual(solve("{p}. :- &initial, not p."), [['p(0)']])
+        self.assertEqual(solve("{p}. :- &final, not p."), [['p(0)']])
+        self.assertEqual(solve("p. :- &final, &initial."), [['p(0)', 'p(1)']])
+        self.assertEqual(solve("&initial :- a. {a}. q. :- &final, &initial."), [['a(0)', 'q(0)', 'q(1)'], ['q(0)', 'q(1)']])
+        self.assertEqual(solve("p. &false :- &final, &initial."), [['p(0)', 'p(1)']])
+        self.assertEqual(solve("p. &true :- &final, &initial."), [['p(0)']])
 
     def test_future(self):
         self.assertEqual(solve("p'."), [])

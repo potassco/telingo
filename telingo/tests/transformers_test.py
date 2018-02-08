@@ -117,6 +117,11 @@ class TestProgramTransformer(TestCase):
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "{p : q'}.")
         # head aggregates
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p'|q.")
+        # initial, final, true, and false
+        self.assertEqual(transform_program("&initial."), (['#program always(__t,__u).', 'not not __initial(__t).'], set(), {}))
+        self.assertEqual(transform_program("&final."), (['#program always(__t,__u).', 'not not __final(__t).'], set(), {}))
+        self.assertEqual(transform_program("&true."), (['#program always(__t,__u).', 'not not #true.'], set(), {}))
+        self.assertEqual(transform_program("&false."), (['#program always(__t,__u).', 'not not #false.'], set(), {}))
 
     def test_constraint(self):
         # simple rules
@@ -138,6 +143,11 @@ class TestProgramTransformer(TestCase):
         self.assertEqual(transform_program(":- {p':q'}."), (
             ['#program always(__t,__u).'], set(),
             {('always', 1): [('#false :- { p((__t+1)) : q((__t+1)) }; __final(__u).', '#false :- { p((__t+1)) : q((__t+1)) }.')]}))
+        # initial, final, true, and false
+        self.assertEqual(transform_program(":-&initial."), (['#program always(__t,__u).', '#false :- __initial(__t).'], set(), {}))
+        self.assertEqual(transform_program(":-&final."), (['#program always(__t,__u).', '#false :- __final(__t).'], set(), {}))
+        self.assertEqual(transform_program(":-&true."), (['#program always(__t,__u).', '#false :- #true.'], set(), {}))
+        self.assertEqual(transform_program(":-&false."), (['#program always(__t,__u).', '#false :- #false.'], set(), {}))
 
     def test_theory(self):
         self.assertEqual(transform_program(":- &tel { a }."), (['#program always(__t,__u).', '#false :- &tel(__t) { a :  }.'], set(), {}))
