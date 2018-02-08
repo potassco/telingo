@@ -1,2 +1,1 @@
 - overwrite text output partially
-- allow to customize version output

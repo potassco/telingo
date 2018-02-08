@@ -78,6 +78,8 @@ class Application:
         See clingo.clingo_main().
         """
         self.program_name = name
+        self.version = "1.0"
+
         self.__imin = 0
         self.__imax = None
         self.__istop = "SAT"
@@ -163,5 +165,5 @@ def main():
     """
     TODO: it would be cool if it where possible to replace part of the output
     """
-    ret = clingo.clingo_main(Application(sys.argv[0]), ["-q2"] + sys.argv[1:])
+    ret = clingo.clingo_main(Application("telingo"), ["-q2"] + sys.argv[1:])
     sys.exit(int(ret))
