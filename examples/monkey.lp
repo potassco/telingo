@@ -36,9 +36,9 @@ onbox :- climb.
 :- climb, 'onbox.
 :- climb, 'at(monkey,X), 'at(box,Y), X!=Y.
 
-#program always.
+#program final.
 
-:- not banana, __final.
+:- not banana.
 
 #show at/2.
 #show onbox/0.

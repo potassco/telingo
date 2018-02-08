@@ -32,7 +32,8 @@ at(X,A) :- 'at(X,A), not at(X,B), opp(A,B).
 % If eats(X,Y), we cannot leave them alone
 :- eats(X,Y), at(X,A), at(Y,A), opp(A,B), at(b,B).
 
-someleft :- at(X,l).
-:- someleft, __final.
+#program final.
+
+:- { at(X,l) } > 0.
 
 #show m/1.
