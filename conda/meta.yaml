@@ -2,7 +2,7 @@
 {% set name = 'telingo' %}
 {% set version = data.get('version') %}
 {% set dev = true %}
-{% set build = 2 %}
+{% set build = 3 %}
 
 package:
   name: {{ name }}
