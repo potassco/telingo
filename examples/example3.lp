@@ -1,8 +1,8 @@
-q(0) :- __initial.
+q(0) :- &initial.
 
-q(X+1) :- 'q(X), not __initial.
-r(X) :- 'r(X), not __initial.
+q(X+1) :- 'q(X), not &initial.
+r(X) :- 'r(X), not &initial.
 
 r(X) :- q(X).
 
-:- #sum { X : r(X) } < 10, __final.
+:- #sum { X : r(X) } < 10, &final.

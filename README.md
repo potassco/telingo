@@ -1,6 +1,10 @@
 # Telingo
 
-`Telingo` is a solver for temporal programs.
+`Telingo` is a solver for temporal programs. It leaverages `clingo`'s input
+language and scripting cababilities to parse and solve programs with temporal
+formulas. As such the input of `telingo` is valid `clingo` input supporting all
+clingo language features like for example aggregates; only the way programs are
+grounded and solved is adjusted.
 
 # Usage
 
@@ -46,11 +50,15 @@ The following program parts are accepted:
 - `#program dynamic.` which applies to all except the first state
 - `#program final.` which applies only to the last state
 
+The following temporal formulas are supported in rule heads and body literals:
+- &initial (true in the initial state)
+- &final (true in the final state)
+
 The following temporal formulas are accepted in constraints and behind default
 negation between the braces of theory atoms of form `&tel { ... }` (see the
 second example below):
 
-- Boolean Formulas
+- Boolean formulas
   - `a & b` (conjunction)
   - `a | b` (disjunction)
   - `a <- b` (left implication)
@@ -71,6 +79,11 @@ second example below):
   - `>* b` (always after)
   - `a >? b` (until)
   - `>? b` (eventually after)
+- Other formulas
+  - `&true` (Boolean constant true)
+  - `&false` (~ &true)
+  - `&initial` (~ > &true)
+  - `&final` (~ < &true)
 
 ## Example I
 
@@ -120,7 +133,7 @@ gun been shot (even though unloaded).
 
 The following example modifies the above program to encode that the gun breaks
 if there were two shots without loading the gun. Furthermore, its last
-integrity constraint selects traces where the loaded gun does not shoot because
+integrity constraint selects traces where the loaded gun was not shoot because
 it is broken.
 
 ```

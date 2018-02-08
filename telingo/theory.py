@@ -101,12 +101,21 @@ class Atom(Formula):
         self.__positive  = positive
 
     def do_translate(self, ctx, step, data):
-        # TODO: does not support classical negation for now...
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             sym = clingo.Function(self.__name, self.__arguments + [step], self.__positive)
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
+
+class BooleanConstant(Formula):
+    def __init__(self, rep, value):
+        Formula.__init__(self, rep)
+        self.__value = value
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            data.literal = -ctx.false_literal if self.__value else ctx.false_literal
 
 class Negation(Formula):
     def __init__(self, rep, arg):
@@ -294,11 +303,11 @@ def create_formula(rep, theory):
         return create_atom(rep, theory, True)
     elif rep.type == clingo.TheoryTermType.Function:
         args = rep.arguments
-        if rep.name in _binary_operators:
+        if rep.name in _binary_operators and len(args) == 2:
             lhs = create_formula(args[0], theory)
             rhs = create_formula(args[1], theory)
             return theory.add_formula(BooleanFormula(str(rep), _binary_operators[rep.name], lhs, rhs))
-        elif rep.name in _unary_operators:
+        elif rep.name in _unary_operators and len(args) == 1:
             arg = create_formula(args[0], theory)
             return theory.add_formula(Negation(str(rep), arg))
         elif rep.name in _tel_operators:
@@ -321,6 +330,18 @@ def create_formula(rep, theory):
                 formula = theory.add_formula(TelFormulaN(str(rep), TelFormula.Since, lhs, rhs))
                 formula.set_future(theory.add_formula(Next("(>{})".format(rep), formula, False)))
                 return formula
+        elif rep.name == "&":
+            arg = rep.arguments[0]
+            if arg.type == clingo.TheoryTermType.Symbol:
+                if arg.name == "initial" or arg.name == "final":
+                    name = "__{}".format(arg.name)
+                    return theory.add_formula(Atom(name, name, [], True))
+                elif arg.name == "true" or arg.name == "false":
+                    return theory.add_formula(BooleanConstant(str(rep), arg.name == "true"))
+                else:
+                    raise RuntimeError("unknown identifier: ".format(rep))
+            else:
+                raise RuntimeError("invalid temporal formula: ".format(rep))
         else:
             return create_atom(rep, theory, True)
     else:

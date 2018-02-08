@@ -156,3 +156,7 @@ class TestMain(TestCase):
 
     def test_future_tel(self):
         self.assertEqual(solve("1 {p;q} 1. :- p', &tel { q }.", imin=2), [['p(0)'], ['p(0)', 'p(1)'], ['p(0)', 'q(1)'], ['q(0)'], ['q(0)', 'q(1)']])
+
+    def test_other(self):
+        self.assertEqual(solve("p. :- &tel { &final & &initial }."), [['p(0)', 'p(1)']])
+        self.assertEqual(solve("p :- not not &tel { &true }. q :- not not &tel { &false }."), [['p(0)']])
