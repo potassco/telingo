@@ -99,60 +99,60 @@ class TestClassify(TestCase):
 class TestProgramTransformer(TestCase):
     def test_rule(self):
         # simple rules
-        self.assertEqual(transform_program("p."), (['#program always(__t,__u).', 'p(__t).'], set(), {}))
-        self.assertEqual(transform_program("p :- 'p."), (['#program always(__t,__u).', 'p(__t) :- p((__t+-1)).'], set(), {}))
-        self.assertEqual(transform_program("p'."), (['#program always(__t,__u).', '__future_p(1,(__t+1)).'], set([('p', 0, True, 1)]), {}))
+        self.assertEqual(transform_program("p."), (['#program initial(__t,__u).', 'p(__t).'], set(), {}))
+        self.assertEqual(transform_program("p :- 'p."), (['#program initial(__t,__u).', 'p(__t) :- p((__t+-1)).'], set(), {}))
+        self.assertEqual(transform_program("p'."), (['#program initial(__t,__u).', '__future_p(1,(__t+1)).'], set([('p', 0, True, 1)]), {}))
         self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_program, "'p.")
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p :- p'.")
         # body aggregates
-        self.assertEqual(transform_program("p :- {'p:q}."), (['#program always(__t,__u).', 'p(__t) :- { p((__t+-1)) : q(__t) }.'], set(), {}))
-        self.assertEqual(transform_program("p :- {p:'q}."), (['#program always(__t,__u).', 'p(__t) :- { p(__t) : q((__t+-1)) }.'], set(), {}))
+        self.assertEqual(transform_program("p :- {'p:q}."), (['#program initial(__t,__u).', 'p(__t) :- { p((__t+-1)) : q(__t) }.'], set(), {}))
+        self.assertEqual(transform_program("p :- {p:'q}."), (['#program initial(__t,__u).', 'p(__t) :- { p(__t) : q((__t+-1)) }.'], set(), {}))
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p :- {p : q'}.")
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p :- {p' : q}.")
         # head aggregates
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "{p' : 'q}.")
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "{not p' : 'q}.")
-        self.assertEqual(transform_program("{not 'p : 'q}."), (['#program always(__t,__u).', '{ not p((__t+-1)) : q((__t+-1)) }.'], set(), {}))
+        self.assertEqual(transform_program("{not 'p : 'q}."), (['#program initial(__t,__u).', '{ not p((__t+-1)) : q((__t+-1)) }.'], set(), {}))
         self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_program, "{'p : q}.")
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "{p : q'}.")
         # head aggregates
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_program, "p'|q.")
         # initial, final, true, and false
-        self.assertEqual(transform_program("&initial."), (['#program always(__t,__u).', 'not not __initial(__t).'], set(), {}))
-        self.assertEqual(transform_program("&final."), (['#program always(__t,__u).', 'not not __final(__t).'], set(), {}))
-        self.assertEqual(transform_program("&true."), (['#program always(__t,__u).', 'not not #true.'], set(), {}))
-        self.assertEqual(transform_program("&false."), (['#program always(__t,__u).', 'not not #false.'], set(), {}))
+        self.assertEqual(transform_program("&initial."), (['#program initial(__t,__u).', 'not not __initial(__t).'], set(), {}))
+        self.assertEqual(transform_program("&final."), (['#program initial(__t,__u).', 'not not __final(__t).'], set(), {}))
+        self.assertEqual(transform_program("&true."), (['#program initial(__t,__u).', 'not not #true.'], set(), {}))
+        self.assertEqual(transform_program("&false."), (['#program initial(__t,__u).', 'not not #false.'], set(), {}))
 
     def test_constraint(self):
         # simple rules
-        self.assertEqual(transform_program(":- p."), (['#program always(__t,__u).', '#false :- p(__t).'], set(), {}))
-        self.assertEqual(transform_program(":- 'p."), (['#program always(__t,__u).', '#false :- p((__t+-1)).'], set(), {}))
+        self.assertEqual(transform_program(":- p."), (['#program initial(__t,__u).', '#false :- p(__t).'], set(), {}))
+        self.assertEqual(transform_program(":- 'p."), (['#program initial(__t,__u).', '#false :- p((__t+-1)).'], set(), {}))
         self.assertEqual(transform_program(":- p'."), (
-            ['#program always(__t,__u).'], set(),
-            {('always', 1): [('#false :- p((__t+1)); __final(__u).', '#false :- p((__t+1)).')]}))
+            ['#program initial(__t,__u).'], set(),
+            {('initial', 1): [('#false :- p((__t+1)); __final(__u).', '#false :- p((__t+1)).')]}))
         self.assertEqual(transform_program("not p :- p'."), (
-            ['#program always(__t,__u).'], set(),
-            {('always', 1): [('not p(__t) :- p((__t+1)); __final(__u).', 'not p(__t) :- p((__t+1)).')]}))
+            ['#program initial(__t,__u).'], set(),
+            {('initial', 1): [('not p(__t) :- p((__t+1)); __final(__u).', 'not p(__t) :- p((__t+1)).')]}))
         self.assertEqual(transform_program("not 'p :- p'."), (
-            ['#program always(__t,__u).'], set(),
-            {('always', 1): [('not p((__t+-1)) :- p((__t+1)); __final(__u).', 'not p((__t+-1)) :- p((__t+1)).')]}))
+            ['#program initial(__t,__u).'], set(),
+            {('initial', 1): [('not p((__t+-1)) :- p((__t+1)); __final(__u).', 'not p((__t+-1)) :- p((__t+1)).')]}))
         self.assertEqual(transform_program("not p' :- p'."), (
-            ['#program always(__t,__u).'], set(),
-            {('always', 1): [('not p((__t+1)) :- p((__t+1)); __final(__u).', 'not p((__t+1)) :- p((__t+1)).')]}))
+            ['#program initial(__t,__u).'], set(),
+            {('initial', 1): [('not p((__t+1)) :- p((__t+1)); __final(__u).', 'not p((__t+1)) :- p((__t+1)).')]}))
         # body aggregates
         self.assertEqual(transform_program(":- {p':q'}."), (
-            ['#program always(__t,__u).'], set(),
-            {('always', 1): [('#false :- { p((__t+1)) : q((__t+1)) }; __final(__u).', '#false :- { p((__t+1)) : q((__t+1)) }.')]}))
+            ['#program initial(__t,__u).'], set(),
+            {('initial', 1): [('#false :- { p((__t+1)) : q((__t+1)) }; __final(__u).', '#false :- { p((__t+1)) : q((__t+1)) }.')]}))
         # initial, final, true, and false
-        self.assertEqual(transform_program(":-&initial."), (['#program always(__t,__u).', '#false :- __initial(__t).'], set(), {}))
-        self.assertEqual(transform_program(":-&final."), (['#program always(__t,__u).', '#false :- __final(__t).'], set(), {}))
-        self.assertEqual(transform_program(":-&true."), (['#program always(__t,__u).', '#false :- #true.'], set(), {}))
-        self.assertEqual(transform_program(":-&false."), (['#program always(__t,__u).', '#false :- #false.'], set(), {}))
+        self.assertEqual(transform_program(":-&initial."), (['#program initial(__t,__u).', '#false :- __initial(__t).'], set(), {}))
+        self.assertEqual(transform_program(":-&final."), (['#program initial(__t,__u).', '#false :- __final(__t).'], set(), {}))
+        self.assertEqual(transform_program(":-&true."), (['#program initial(__t,__u).', '#false :- #true.'], set(), {}))
+        self.assertEqual(transform_program(":-&false."), (['#program initial(__t,__u).', '#false :- #false.'], set(), {}))
 
     def test_theory(self):
-        self.assertEqual(transform_program(":- &tel { a }."), (['#program always(__t,__u).', '#false :- &tel(__t) { a :  }.'], set(), {}))
-        self.assertEqual(transform_program("a :- not &tel { a }."), (['#program always(__t,__u).', 'a(__t) :- not &tel(__t) { a :  }.'], set(), {}))
-        self.assertEqual(transform_program("a :- not not &tel { a }."), (['#program always(__t,__u).', 'a(__t) :- not not &tel(__t) { a :  }.'], set(), {}))
+        self.assertEqual(transform_program(":- &tel { a }."), (['#program initial(__t,__u).', '#false :- &tel(__t) { a :  }.'], set(), {}))
+        self.assertEqual(transform_program("a :- not &tel { a }."), (['#program initial(__t,__u).', 'a(__t) :- not &tel(__t) { a :  }.'], set(), {}))
+        self.assertEqual(transform_program("a :- not not &tel { a }."), (['#program initial(__t,__u).', 'a(__t) :- not not &tel(__t) { a :  }.'], set(), {}))
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "a :- &tel { a }.")
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
@@ -178,23 +178,24 @@ class TestTransform(unittest.TestCase):
               ('initial', 'initial', range(0, 1))]
 
     def test_transform(self):
-        self.assertEqual(transform("p."), (['#program always(__t,__u).', 'p(__t).'] + TestTransform.static, [], TestTransform.parts))
+        self.maxDiff = None
+        self.assertEqual(transform("p."), (['#program initial(__t,__u).', 'p(__t).'] + TestTransform.static, [], TestTransform.parts))
         self.assertEqual(transform("p'."), (
-            ['#program always(__t,__u).',
+            ['#program initial(__t,__u).',
              '__future_p(1,(__t+1)).',
              '#program always(__t,__u).',
              'p(__t) :- __future_p(1,__t).'] + TestTransform.static,
             [('__future_p', 2, True)], TestTransform.parts))
         self.assertEqual(transform("p(X)|q."), (
-            ['#program always(__t,__u).',
+            ['#program initial(__t,__u).',
              'q(__t) : ; p(X,__t) : .'] + TestTransform.static,
             [], TestTransform.parts))
         self.assertEqual(transform(":- p''."), (
-            ['#program always(__t,__u).',
-             '#program always_0_1(__t,__u).',
+            ['#program initial(__t,__u).',
+             '#program initial_0_1(__t,__u).',
              '#false :- p((__t+2)); __final(__u).',
-             '#program always_2(__t,__u).',
+             '#program initial_2(__t,__u).',
              '#false :- p((__t+2)).'] + TestTransform.static, [],
-            [('always', 'always_0_1', range(0, 2)),
-             ('always', 'always_2',   range(2, 3))] + TestTransform.parts))
+            [('initial', 'initial_0_1', range(0, 2)),
+             ('initial', 'initial_2',   range(2, 3))] + TestTransform.parts))
 

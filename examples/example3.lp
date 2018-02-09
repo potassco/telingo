@@ -1,3 +1,5 @@
+#program always.
+
 q(0) :- &initial.
 
 q(X+1) :- 'q(X), not &initial.

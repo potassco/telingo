@@ -1,3 +1,5 @@
+#program always.
+
 item(w;c;s).
 opp(l,r). opp(r,l).
 eats(w,s). eats(s,c).

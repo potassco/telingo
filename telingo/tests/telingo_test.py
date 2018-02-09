@@ -20,12 +20,12 @@ def parse_model(m, s, dual):
         ret = [flip(sym) for sym in ret]
     return list(map(str, sorted(ret)))
 
-def solve(s, imin=0, dual=False):
+def solve(s, imin=0, dual=False, always=True):
     r = []
     imax  = 20
     prg = clingo.Control(['0'], message_limit=0)
     with prg.builder() as b:
-        future_sigs, reground_parts = transformers.transform([s], b.add)
+        future_sigs, reground_parts = transformers.transform([("#program always. " if always else "") + s], b.add)
     telingo.imain(prg, future_sigs, reground_parts, lambda m, s: r.append(parse_model(m, s, dual)), imax=20, imin=imin)
     return sorted(r)
 
@@ -55,9 +55,9 @@ class TestMain(TestCase):
         self.assertEqual(solve("p'(1;2,3) :- __initial."), [['p(1,1)', 'p(2,3,1)']])
 
     def test_constraint(self):
-        self.assertEqual(solve(":- p'."), [[]])
-        self.assertEqual(solve(":- not p', __initial. {p}."), [['p(0)', 'p(1)'], ['p(1)']])
-        self.assertEqual(solve(":- not p'', __initial. {p}."), [['p(0)', 'p(1)', 'p(2)'], ['p(0)', 'p(2)'], ['p(1)', 'p(2)'], ['p(2)']])
+        self.assertEqual(solve(":- p'.", always=False), [[]])
+        self.assertEqual(solve(":- not p'. #program always. {p}.", always=False), [['p(0)', 'p(1)'], ['p(1)']])
+        self.assertEqual(solve(":- not p''. #program always. {p}.", always=False), [['p(0)', 'p(1)', 'p(2)'], ['p(0)', 'p(2)'], ['p(1)', 'p(2)'], ['p(2)']])
 
     def test_program(self):
         self.assertEqual(solve("#program always. p.", imin=2), [['p(0)'], ['p(0)', 'p(1)']])

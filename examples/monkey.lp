@@ -1,3 +1,5 @@
+#program always.
+
 location(door;window;middle).
 
 #program initial.

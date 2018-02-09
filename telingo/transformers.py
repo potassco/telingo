@@ -430,7 +430,7 @@ class ProgramTransformer(Transformer):
         if self.__final:
             prg.name = "always"
         if prg.name == "base":
-            prg.name = "always"
+            prg.name = "initial"
         prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name))
         prg.parameters.append(clingo.ast.Id(prg.location, _time_parameter_name_alt))
         self.__part = prg.name
