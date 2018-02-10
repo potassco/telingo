@@ -90,12 +90,11 @@ class Formula:
 
 class Atom(Formula):
     def __init__(self, name, arguments=[], positive=True):
+        rep = "({}{}({}))".format("" if positive else "-", name, ",".join([str(a) for a in arguments]))
         if name.startswith("'"):
             raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
         if name.endswith("'"):
             raise RuntimeError("temporal formulas use > instead of trailing primes: ".format(rep))
-
-        rep = "({}{}({}))".format("" if positive else "-", name, ",".join(arguments))
         Formula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
@@ -181,7 +180,7 @@ _unary_operators = {"~"}
 
 class Previous(Formula):
     def __init__(self, arg, weak):
-        Formula.__init__("(<{})".format(arg._rep))
+        Formula.__init__(self, "(<{})".format(arg._rep))
         self.__arg  = arg
         self.__weak = weak
 
