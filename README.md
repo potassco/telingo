@@ -85,9 +85,11 @@ second example below):
   - `>? b` (eventually after)
 - Other formulas
   - `&true` (Boolean constant true)
-  - `&false` (~ &true)
-  - `&initial` (~ > &true)
-  - `&final` (~ < &true)
+  - `&false` (`~ &true`)
+  - `&initial` (`~ > &true`)
+  - `&final` (`~ < &true`)
+  - `<< p` (initially: `<* (~ &initial | p)`)
+  - `>> p` (finally: `>* (~ &final | p)`)
 
 ## Example I
 

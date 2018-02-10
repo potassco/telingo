@@ -565,10 +565,12 @@ def transform(inputs, callback):
                 <: : 4, unary; % weak previous
                 <? : 4, unary; % eventually-
                 <* : 4, unary; % always-
+                << : 4, unary; % initially
                 >  : 4, unary; % next
                 >: : 4, unary; % weak next
                 >? : 4, unary; % eventually+
                 >* : 4, unary; % always+
+                >> : 4, unary; % finally
                 >* : 3, binary, left; % release
                 >? : 3, binary, left; % until
                 <* : 3, binary, left; % trigger
