@@ -205,11 +205,12 @@ class Next(Formula):
                 ctx.add_todo(self._rep, self, step)
                 data.done = False
         elif not data.done:
-            assert(step in range(0, ctx.horizon))
-            arg = self.__arg.translate(ctx, step+1)
-            make_equal(ctx.backend, data.literal, arg)
-            ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
-            data.done = True
+            assert(step in range(0, ctx.horizon + 1))
+            if step < ctx.horizon:
+                arg = self.__arg.translate(ctx, step+1)
+                make_equal(ctx.backend, data.literal, arg)
+                ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
+                data.done = True
 
 class TelFormula(Formula):
     Since   = 0

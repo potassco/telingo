@@ -160,3 +160,27 @@ class TestMain(TestCase):
     def test_other(self):
         self.assertEqual(solve("p. :- &tel { &final & &initial }."), [['p(0)', 'p(1)']])
         self.assertEqual(solve("p :- not not &tel { &true }. q :- not not &tel { &false }."), [['p(0)']])
+
+    def test_eventually(self):
+        s = '''
+        #program initial.
+        aux.
+        #program dynamic.
+        aux :- 'aux, not 'q.
+        #program always.
+        p.
+        q :- aux, not &tel{ > >? q }.
+        #show p/0.
+        #show q/0.
+        '''
+        self.assertEqual(solve(s, imin=3), [
+            ['p(0)', 'p(1)', 'p(2)', 'q(0)'],
+            ['p(0)', 'p(1)', 'p(2)', 'q(1)'],
+            ['p(0)', 'p(1)', 'p(2)', 'q(2)'],
+            ['p(0)', 'p(1)', 'q(0)'],
+            ['p(0)', 'p(1)', 'q(1)'],
+            ['p(0)', 'q(0)']])
+        self.assertEqual(solve(s + "#program initial. q.", imin=3), [['p(0)', 'p(1)', 'p(2)', 'q(0)'], ['p(0)', 'p(1)', 'q(0)'], ['p(0)', 'q(0)']])
+        self.assertEqual(solve(s + "#program initial. q'.", imin=3), [['p(0)', 'p(1)', 'p(2)', 'q(1)'], ['p(0)', 'p(1)', 'q(1)']])
+        self.assertEqual(solve(s + "#program initial. q''.", imin=3), [['p(0)', 'p(1)', 'p(2)', 'q(2)']])
+
