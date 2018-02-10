@@ -51,6 +51,7 @@ class TestTermTransformer(TestCase):
 
     def test_fail(self):
         self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_term, "'p", fail_past=True)
+        self.assertRaisesRegex(RuntimeError, "past atoms not supported", transform_term, "_p", fail_past=True)
         self.assertRaisesRegex(RuntimeError, "future atoms not supported", transform_term, "p'", fail_future=True)
 
     def test_pool(self):
@@ -127,6 +128,7 @@ class TestProgramTransformer(TestCase):
         # simple rules
         self.assertEqual(transform_program(":- p."), (['#program initial(__t,__u).', '#false :- p(__t).'], set(), {}))
         self.assertEqual(transform_program(":- 'p."), (['#program initial(__t,__u).', '#false :- p((__t+-1)).'], set(), {}))
+        self.assertEqual(transform_program(":- _p."), (['#program initial(__t,__u).', '#false :- p(0).'], set(), {}))
         self.assertEqual(transform_program(":- p'."), (
             ['#program initial(__t,__u).'], set(),
             {('initial', 1): [('#false :- p((__t+1)); __final(__u).', '#false :- p((__t+1)).')]}))

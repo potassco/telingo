@@ -39,6 +39,10 @@ be suffixed with a prime, e.g. - `p(1)'`. An arbitrary number of primes can be
 used. If both leading and trailing primes are used then this is equivalent to
 removing the lesser amount of primes from both sides.
 
+The `_` can be used as an initially operator. For example `_p` evaluates to
+true if `p` holds in the initial state. It can be used wherever past operators
+can be used.
+
 Atoms referring to the future are only accepted in heads of normal rules and
 constraints. Atoms referring to the past are only accepted in rule bodies (and
 negative rule heads).

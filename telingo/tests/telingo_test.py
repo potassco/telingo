@@ -46,6 +46,7 @@ class TestMain(TestCase):
         self.assertEqual(solve("&initial :- a. {a}. q. :- &final, &initial."), [['a(0)', 'q(0)', 'q(1)'], ['q(0)', 'q(1)']])
         self.assertEqual(solve("p. &false :- &final, &initial."), [['p(0)', 'p(1)']])
         self.assertEqual(solve("p. &true :- &final, &initial."), [['p(0)']])
+        self.assertEqual(solve("d. :- &final. #program always. p :- d. q :- _d.", always=False), [['d(0)', 'p(0)', 'q(0)', 'q(1)']])
 
     def test_future(self):
         self.assertEqual(solve("p'."), [])
