@@ -1,5 +1,6 @@
 """
-TODO: document
+This module exports functions to translate (ground) theory atoms to rules via
+clingo's backend.
 """
 
 import clingo
@@ -34,13 +35,37 @@ def make_disjunction(backend, e, a, b):
     backend.add_rule([], [-e, b])
 
 class StepData:
+    """
+    Stores step specific inforation of theory atoms, like the set of literals
+    it is eqivalent to or whether it's translation is already complete.
+
+    Members:
+    literal  -- The literal representing the theory atom.
+    literals -- All literals equivalent to the theory atom.
+    todo     -- Literals that have not yet been made equivalent to the
+                representative literal.
+    done     -- Whether translation of the theory atom is done.
+    """
     def __init__(self):
+        """
+        Initialize the step information.
+        """
         self.literal  = None
         self.literals = set()
         self.todo     = []
         self.done     = True
 
     def add_literal(self, backend):
+        """
+        Set the representative of the literal.
+
+        Must only be called once. If there are already equivalent literals one
+        of them is chosen as a representative.  Otherwise, a literal and a
+        choice rule is added.
+
+        Arguments:
+        backend -- Backend to add the choice rule and literal to.
+        """
         assert(self.literal is None)
         if len(self.literals) > 0:
             self.literal = min(self.literals)
@@ -51,7 +76,27 @@ class StepData:
         return self.literal
 
 class Context:
+    """
+    Class gathering arguments used throughout functions in this module.
+
+    Members:
+    add_todo        -- Function to add theory atoms that have to be translated
+                       later.
+    backend         -- Clingo Backend object.
+    symbols         -- Clingo SymbolicAtoms object.
+    horizon         -- Current search horizon.
+    __false_literal -- Function to obtain a false literal.
+    """
     def __init__(self, backend, symbols, add_todo, false_literal, horizon):
+        """
+        Initializes the context.
+
+        Arguments:
+        backend       -- Backend object.
+        symbols       -- SymbolicAtoms object.
+        add_todo      -- Function to add theory atoms to the todo list.
+        false_literal -- Function to obtain a false literal.
+        """
         self.add_todo        = add_todo
         self.backend         = backend
         self.symbols         = symbols
@@ -60,18 +105,47 @@ class Context:
 
     @property
     def false_literal(self):
+        """
+        Returns a literal that is always false.
+        """
         return self.__false_literal(self.backend)
 
 class Formula:
+    """
+    Base class of all temporal and Boolean formulas.
+
+    Members:
+    __rep  -- unique string representation of the formula
+    __data -- map from time points to StepData objects
+    """
     def __init__(self, rep):
+        """
+        Initializes a formula with the given string representation.
+        """
         self.__rep  = rep
         self.__data = {}
 
     @property
     def _rep(self):
+        """
+        Return the unique string representaiton of the formula.
+        """
         return self.__rep
 
     def translate(self, ctx, step):
+        """
+        Translates a formula at a given step.
+
+        Adds a new StepData object to the __data map (if it does not exist
+        yet). Calls do_translate, which has to be implemented by base classes.
+        And makes sure that the theory atom has a representative literal and
+        all literals associated with the theory atom are made equivalent by
+        rules.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        """
         data = self.__data.setdefault(step, StepData())
         self.do_translate(ctx, step, data)
         if len(data.todo) > 0:
@@ -81,6 +155,14 @@ class Formula:
         return data.literal
 
     def add_atom(self, atom, step):
+        """
+        Adds the given atom to the equivalent literals of the theory atom at
+        the given step.
+
+        Arguments:
+        atom -- ASP atom to add to the theory atom.
+        step -- Step at which to add.
+        """
         data = self.__data.setdefault(step, StepData())
         if atom not in data.literals:
             data.literals.add(atom)
@@ -89,7 +171,23 @@ class Formula:
 # Boolean Formulas {{{1
 
 class Atom(Formula):
+    """
+    An atomic formula.
+
+    Members:
+    __name      -- Predicate name.
+    __arguments -- Arguments of the atom (list of symbols).
+    __positive  -- Classical negation sign.
+    """
     def __init__(self, name, arguments=[], positive=True):
+        """
+        Initializes the atom.
+
+        Arguments:
+        name      -- Name of the atom.
+        arguments -- Arguments of the atom.
+        positive  -- Classical negation sign.
+        """
         rep = "({}{}({}))".format("" if positive else "-", name, ",".join([str(a) for a in arguments]))
         if name.startswith("'"):
             raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
@@ -101,6 +199,20 @@ class Atom(Formula):
         self.__positive  = positive
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates an atom.
+
+        Requires that the step is within the horizon.
+
+        This means looking the atom up in the symbolic atoms for the given step
+        and setting the literal associated with the step accordingly. If the
+        atom does not exist, it is set to false.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             sym = clingo.Function(self.__name, self.__arguments + [step], self.__positive)
@@ -108,11 +220,36 @@ class Atom(Formula):
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
 class BooleanConstant(Formula):
+    """
+    Formula capturing a Boolean constant.
+
+    Members:
+    __value -- Truth value of the formula.
+    """
     def __init__(self, value):
+        """
+        Initializes the formula with the given value.
+
+        Members:
+        __value -- Boolean value of the formula.
+        """
         Formula.__init__(self, "(&true)" if value else "(&false)")
         self.__value = value
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates the formula.
+
+        Requires that the step is within the horizon.
+
+        Sets the literal of the data object to a true or false literal
+        depending on the value of the formula.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -ctx.false_literal if self.__value else ctx.false_literal
