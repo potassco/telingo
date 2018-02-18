@@ -381,12 +381,42 @@ _unary_operators = {"~"}
 # Temporal Formulas {{{1
 
 class Previous(Formula):
+    """
+    Captures a formula referring to the previous state.
+
+    Members:
+    __arg  -- The argument of the previous operator.
+    __weak -- Whether this is a weak previous operator.
+    """
     def __init__(self, arg, weak):
+        """
+        Initializes the formula.
+
+        Arguments:
+        arg  -- The argument of the previous operator.
+        weak -- Whether this is a weak previous operator.
+        """
         Formula.__init__(self, "(<{})".format(arg._rep))
         self.__arg  = arg
         self.__weak = weak
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates an atom.
+
+        Requires that the step is within the horizon.
+
+        Translates the argument with respect to the previous step and sets the
+        literal of the formula to the literal obtained thus. If the current
+        step refers to the initial state, the literal is either set to the
+        true or false literal depending on whether this is a weak previous
+        operator or not.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step > 0:
@@ -397,21 +427,79 @@ class Previous(Formula):
                     data.literal = -data.literal
 
 class Initially(Formula):
+    """
+    Captures a formula referring to the initial situation.
+
+    Members:
+    __arg  -- The argument of the previous operator.
+    """
     def __init__(self, arg):
+        """
+        Initializes the formula.
+
+        Arguments:
+        arg  -- The argument of the initial operator.
+        """
         Formula.__init__(self, "(<<{})".format(arg._rep))
         self.__arg  = arg
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates an atom.
+
+        Requires that the step is within the horizon.
+
+        Translates the argument with respect to the initial state and sets the
+        literal accordingly.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             data.literal = self.__arg.translate(ctx, 0)
 
 class Next(Formula):
+    """
+    Captures a formula referring to the next state.
+
+    Members:
+    __arg  -- The argument of the next operator.
+    __weak -- Whether this is a weak next operator.
+    """
     def __init__(self, arg, weak):
+        """
+        Initializes the formula.
+
+        Arguments:
+        arg  -- The argument of the next operator.
+        weak -- Whether this is a weak next operator.
+        """
         Formula.__init__(self, "(>{})".format(arg._rep))
         self.__arg  = arg
         self.__weak = weak
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates an atom.
+
+        Requires that the step is within the horizon.
+
+        Translates the argument with respect to the next step and sets the
+        literal of the formula to the literal obtained thus. If the current
+        step refers to the final state, a false external literal is created and
+        the translation deferred until the next step.
+
+        Note that the correctnis of this translation requires that next
+        operators are not used in rule heads, which is forbidden by the theory
+        definition.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step < ctx.horizon:
@@ -431,16 +519,59 @@ class Next(Formula):
                 data.done = True
 
 class TelFormula(Formula):
+    """
+    Captures a since, trigger, release, or until formula.
+
+    This is an abstract class providing the basic translation for formulas
+    referring to both the future and past.  Due to technical differences, the
+    future and past versions are implemented in specialised classes.
+
+    The left-hand-side of the operator can be None in which case either an
+    eventually or an always operator is represented.
+
+    Members:
+    _op  -- The id of the operator.
+    _lhs -- The left-hand-side of the temporal operator.
+    _rhs -- The right-hand-side of the temporal operator.
+
+    Class Constants:
+    Since   -- Id of the since or release operator.
+    Trigger -- Id of the trigger or until operator.
+    """
     Since   = 0
     Trigger = 1
 
     def __init__(self, rep, op, lhs, rhs):
+        """
+        Initializes the formula.
+
+        Arguments:
+        rep -- Stringu representation of the formula.
+        arg -- The id of the operator.
+        lhs -- The left-hand-side of the operator.
+        rhs -- The right-hand-side of the operator.
+        """
         Formula.__init__(self, rep)
         self._op  = op
         self._lhs = lhs
         self._rhs = rhs
 
     def _translate(self, ctx, step, data, pre):
+        """
+        Performs the translation of the temporal operator common to both future
+        and past formulas.
+
+        The translation works inductively. The literal pre is the literal
+        obtained from the inductive step. Since since and trigger are dual, the
+        same clauses are added but with the literals inverted in the trigger
+        case.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        pre  -- The literal obtained from the inductive step.
+        """
         lhs = None if self._lhs is None else self._lhs.translate(ctx, step)
         rhs = self._rhs.translate(ctx, step)
         lit = data.add_literal(ctx.backend)
