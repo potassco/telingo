@@ -255,16 +255,53 @@ class BooleanConstant(Formula):
             data.literal = -ctx.false_literal if self.__value else ctx.false_literal
 
 class Negation(Formula):
+    """
+    Formula capturing (classical) negation.
+
+    Members:
+    __arg -- Formula to negate.
+    """
     def __init__(self, arg):
+        """
+        Initializes the formula with the formula to negate.
+        """
         Formula.__init__(self, "(~{})".format(arg._rep))
         self.__arg = arg
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates the formula.
+
+        Requires that the step is within the horizon.
+
+        Sets the literal to the negated literal of the subformula.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
 
 class BooleanFormula(Formula):
+    """
+    Formula capturing binary Boolean formulas.
+
+    Members:
+    __operator -- The Boolean connective.
+    __lhs      -- The formula on the left-hand-side.
+    __rhs      -- The formula on the left-hand-side.
+
+    Class Constants:
+    And -- Id of & connective.
+    Or  -- Id of | connective.
+    Eq  -- Id of <> connective.
+    Li  -- Id of <- connective.
+    Ri  -- Id of -> connective.
+    Ops -- Map from connective id to its string representation.
+    """
     And = 0
     Or  = 1
     Eq  = 2
@@ -278,6 +315,14 @@ class BooleanFormula(Formula):
         Ri: "->"}
 
     def __init__(self, operator, lhs, rhs):
+        """
+        Initializes the formula.
+
+        Arguments:
+        operator -- Id of the connective.
+        lhs      -- Formula on the left-hand-side.
+        rhs      -- Formula on the right-hand-side.
+        """
         rep = "({}{}{})".format(lhs._rep, BooleanFormula.Ops[operator], rhs._rep)
         Formula.__init__(self, rep)
         self.__operator = operator
@@ -285,6 +330,20 @@ class BooleanFormula(Formula):
         self.__rhs      = rhs
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates the formula.
+
+        Requires that the step is within the horizon.
+
+        Sets a literal for the formula at the given step and adds clauses based
+        on the type of the connective. Clauses are emulated with choices and
+        integrity constraints.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             lhs = self.__lhs.translate(ctx, step)
@@ -304,6 +363,9 @@ class BooleanFormula(Formula):
                 ctx.backend.add_rule([], [-lit,  rhs, -lhs])
                 ctx.backend.add_rule([], [-lit, -rhs,  lhs])
 
+"""
+Map from binary Boolean connective strings to their ids.
+"""
 _binary_operators = {
     "&": BooleanFormula.And,
     "|": BooleanFormula.Or,
@@ -311,6 +373,9 @@ _binary_operators = {
     "<-": BooleanFormula.Li,
     "->": BooleanFormula.Ri}
 
+"""
+Map from unary Boolean connective strings to their ids.
+"""
 _unary_operators = {"~"}
 
 # Temporal Formulas {{{1
