@@ -685,6 +685,14 @@ _tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?", ">>", "<<"}
 # Theory of Formulas {{{1
 
 def create_symbol(rep):
+    """
+    Returns the symbolic representation of the given theory term.
+
+    Throws an error if rep it is not a valid symbol.
+
+    Arguments:
+    rep -- Theory term to translate.
+    """
     if rep.type == clingo.TheoryTermType.Number:
         return clingo.Number(rep.number)
     elif rep.type in [clingo.TheoryTermType.List, clingo.TheoryTermType.Set]:
@@ -704,6 +712,16 @@ def create_symbol(rep):
         return clingo.Function(name, [create_symbol(arg) for arg in args])
 
 def create_atom(rep, theory, positive):
+    """
+    Returns the atom corresponding the given theory term.
+
+    Throws an error if rep it is not a valid atom.
+
+    Arguments:
+    rep      -- Theory term to translate.
+    theory   -- The theory to which to add the atom.
+    positive -- Boolean indicating the classical sign.
+    """
     if rep.type == clingo.TheoryTermType.Symbol:
         return theory.add_formula(Atom(rep.name, [], positive))
     elif rep.type == clingo.TheoryTermType.Function:
@@ -714,6 +732,15 @@ def create_atom(rep, theory, positive):
     raise RuntimeError("invalid atom: ".format(rep))
 
 def create_formula(rep, theory):
+    """
+    Returns the temporal formula corresponding the given theory term.
+
+    Throws an error if rep it is not a valid formula.
+
+    Arguments:
+    rep      -- Theory term to translate.
+    theory   -- The theory to which to add the formula.
+    """
     if rep.type == clingo.TheoryTermType.Symbol:
         return create_atom(rep, theory, True)
     elif rep.type == clingo.TheoryTermType.Function:
