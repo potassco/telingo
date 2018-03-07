@@ -491,7 +491,7 @@ class Next(Formula):
         step refers to the final state, a false external literal is created and
         the translation deferred until the next step.
 
-        Note that the correctnis of this translation requires that next
+        Note that the correctness of this translation requires that next
         operators are not used in rule heads, which is forbidden by the theory
         definition.
 
@@ -589,11 +589,37 @@ class TelFormula(Formula):
 
 
 class TelFormulaP(TelFormula):
+    """
+    Captures a since or trigger formulas.
+
+    The left-hand-side of the operator can be None in which case either an
+    eventually or an always operator is represented.
+    """
     def __init__(self, op, lhs, rhs):
+        """
+        Initializes the formula.
+
+        Arguments:
+        arg -- The id of the operator.
+        lhs -- The left-hand-side of the operator.
+        rhs -- The right-hand-side of the operator.
+        """
         rep = "({}{}{})".format("" if lhs is None else lhs._rep, "<?" if op == TelFormula.Since else "<*", rhs._rep)
         TelFormula.__init__(self, rep, op, lhs, rhs)
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates the formula.
+
+        Requires that the step is within the horizon.
+
+        The formula is translated inductively using TelFormula._translate.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step == 0:
@@ -603,15 +629,52 @@ class TelFormulaP(TelFormula):
                 self._translate(ctx, step, data, pre)
 
 class TelFormulaN(TelFormula):
+    """
+    Captures a release or until formulas.
+
+    The left-hand-side of the operator can be None in which case either an
+    eventually or an always operator is represented.
+
+    Members:
+    __future -- Next formula referring to the future to ease the translation.
+    """
     def __init__(self, op, lhs, rhs):
+        """
+        Initializes the formula.
+
+        Arguments:
+        arg -- The id of the operator.
+        lhs -- The left-hand-side of the operator.
+        rhs -- The right-hand-side of the operator.
+        """
         rep = "({}{}{})".format("" if lhs is None else lhs._rep, ">?" if op == TelFormula.Since else ">*", rhs._rep)
         TelFormula.__init__(self, rep, op, lhs, rhs)
         self.__future = None
 
     def set_future(self, future):
+        """
+        Set the future formula for the inductive translation.
+
+        This is something like (> self).
+
+        Arguments:
+        future -- the formula
+        """
         self.__future = future
 
     def do_translate(self, ctx, step, data):
+        """
+        Translates the formula.
+
+        Requires that the step is within the horizon.
+
+        The formula is translated inductively using TelFormula._translate.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             fut = self.__future.translate(ctx, step)
