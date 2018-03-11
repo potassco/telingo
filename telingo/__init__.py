@@ -124,16 +124,16 @@ class Application:
         table = {}
         for sym in model.symbols(shown=True):
             if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1]))
+                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
         for step in range(self.__horizon+1):
             symbols = table.get(step, [])
             sys.stdout.write(" State {}:".format(step))
             sig = None
             for sym in sorted(symbols):
                 if not sym.name.startswith('__'):
-                    if (sym.name, len(sym.arguments)) != sig:
+                    if (sym.name, len(sym.arguments), sym.positive) != sig:
                         sys.stdout.write("\n ")
-                        sig = (sym.name, len(sym.arguments))
+                        sig = (sym.name, len(sym.arguments), sym.positive)
                     sys.stdout.write(" {}".format(sym))
             sys.stdout.write("\n".format(step))
         return True
