@@ -193,8 +193,10 @@ class TestMain(TestCase):
         self.assertEqual(solve(s + "#program initial. q''.", imin=3), [['p(0)', 'p(1)', 'p(2)', 'q(2)']])
 
     def test_sequence(self):
-        self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b > b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)'], ['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'b(0)', 'b(1)']])
-        self.assertEqual(solve("{b}. a. #program final. :- not &tel {b < b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'a(2)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'b(0)', 'b(1)']])
-        self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b > b > b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)']])
-        self.assertEqual(solve("{b}. a. #program final. :- not &tel {b < b < b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)']])
+        self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b ;> b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)'], ['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'b(0)', 'b(1)']])
+        self.assertEqual(solve("{b}. a. #program final. :- not &tel {b <; b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'a(2)', 'b(1)', 'b(2)'], ['a(0)', 'a(1)', 'b(0)', 'b(1)']])
+        self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b ;> b ;> b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)']])
+        self.assertEqual(solve("{b}. a. #program final. :- not &tel {b <; b <; b}.", imin=3), [['a(0)', 'a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)']])
+        self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b ;>: b}.", imin=2), [['a(0)', 'a(1)', 'b(0)', 'b(1)'], ['a(0)', 'b(0)']])
+        self.assertEqual(solve("{b}. a. #program final. :- not &tel {b <:; b}.", imin=2), [['a(0)', 'a(1)', 'b(0)', 'b(1)'], ['a(0)', 'b(0)']])
 

@@ -558,32 +558,32 @@ def transform(inputs, callback):
     clingo.parse_program(dedent('''\
         #theory tel {
             formula  {
-                &  : 5, unary; % prefix for keywords
-                -  : 5, unary; % classical negation
-                ~  : 5, unary; % negation
-                <  : 5, unary; % previous
-                <: : 5, unary; % weak previous
-                <? : 5, unary; % eventually-
-                <* : 5, unary; % always-
-                << : 5, unary; % initially
-                >  : 5, unary; % next
-                >: : 5, unary; % weak next
-                >? : 5, unary; % eventually+
-                >* : 5, unary; % always+
-                >> : 5, unary; % finally
-                >* : 4, binary, left;  % release
-                >? : 4, binary, left;  % until
-                <* : 4, binary, left;  % trigger
-                <? : 4, binary, left;  % since
-                &  : 3, binary, left;  % and
-                |  : 2, binary, left;  % or
-                <- : 1, binary, left;  % left implication
-                -> : 1, binary, left;  % right implication
-                <> : 1, binary, left;  % equivalence
-                >  : 0, binary, right; % sequence next
-                >: : 0, binary, right; % sequence weak next
-                <  : 0, binary, left;  % sequence previous
-                <: : 0, binary, left   % sequence weak previous
+                &   : 5, unary; % prefix for keywords
+                -   : 5, unary; % classical negation
+                ~   : 5, unary; % negation
+                <   : 5, unary; % previous
+                <:  : 5, unary; % weak previous
+                <?  : 5, unary; % eventually-
+                <*  : 5, unary; % always-
+                <<  : 5, unary; % initially
+                >   : 5, unary; % next
+                >:  : 5, unary; % weak next
+                >?  : 5, unary; % eventually+
+                >*  : 5, unary; % always+
+                >>  : 5, unary; % finally
+                >*  : 4, binary, left;  % release
+                >?  : 4, binary, left;  % until
+                <*  : 4, binary, left;  % trigger
+                <?  : 4, binary, left;  % since
+                &   : 3, binary, left;  % and
+                |   : 2, binary, left;  % or
+                <-  : 1, binary, left;  % left implication
+                ->  : 1, binary, left;  % right implication
+                <>  : 1, binary, left;  % equivalence
+                ;>  : 0, binary, right; % sequence next
+                ;>: : 0, binary, right; % sequence weak next
+                <;  : 0, binary, left;  % sequence previous
+                <:; : 0, binary, left   % sequence weak previous
             };
             &tel/1 : formula, body
         }.

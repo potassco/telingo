@@ -680,7 +680,7 @@ class TelFormulaN(TelFormula):
             fut = self.__future.translate(ctx, step)
             self._translate(ctx, step, data, fut)
 
-_tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?", ">>", "<<"}
+_tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?", ">>", "<<", "<;", "<:;", ";>", ";>:"}
 
 # Theory of Formulas {{{1
 
@@ -756,10 +756,9 @@ def create_formula(rep, theory):
             lhs = None if len(args) == 1 else create_formula(args[0], theory)
             rhs = create_formula(args[-1], theory)
             if rep.name == "<" or rep.name == "<:":
-                if lhs is not None:
-                    return theory.add_formula(BooleanFormula(BooleanFormula.And, Previous(lhs, rep.name == "<:"), rhs))
-                else:
-                    return theory.add_formula(Previous(rhs, rep.name == "<:"))
+                return theory.add_formula(Previous(rhs, rep.name == "<:"))
+            elif rep.name == "<;" or rep.name == "<:;":
+                return theory.add_formula(BooleanFormula(BooleanFormula.And, Previous(lhs, rep.name == "<:;"), rhs))
             elif rep.name == "<*":
                 return theory.add_formula(TelFormulaP(TelFormula.Trigger, lhs, rhs))
             elif rep.name == "<?":
@@ -767,10 +766,9 @@ def create_formula(rep, theory):
             elif rep.name == "<<":
                 return theory.add_formula(Initially(rhs))
             elif rep.name == ">" or rep.name == ">:":
-                if lhs is not None:
-                    return theory.add_formula(BooleanFormula(BooleanFormula.And, lhs, Next(rhs, rep.name == ">:")))
-                else:
-                    return theory.add_formula(Next(rhs, rep.name == ">:"))
+                return theory.add_formula(Next(rhs, rep.name == ">:"))
+            elif rep.name == ";>" or rep.name == ";>:":
+                return theory.add_formula(BooleanFormula(BooleanFormula.And, lhs, Next(rhs, rep.name == ";>:")))
             elif rep.name == ">*":
                 formula = theory.add_formula(TelFormulaN(TelFormula.Trigger, lhs, rhs))
                 formula.set_future(theory.add_formula(Next(formula, True)))
