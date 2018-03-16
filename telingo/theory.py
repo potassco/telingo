@@ -387,18 +387,22 @@ class Previous(Formula):
     Members:
     __arg  -- The argument of the previous operator.
     __weak -- Whether this is a weak previous operator.
+    __n    -- How many steps to look back.
     """
-    def __init__(self, arg, weak):
+    def __init__(self, arg, n, weak):
         """
         Initializes the formula.
 
         Arguments:
         arg  -- The argument of the previous operator.
         weak -- Whether this is a weak previous operator.
+        n    -- How many steps to look back.
         """
-        Formula.__init__(self, "(<{})".format(arg._rep))
+        assert(n > 0)
+        Formula.__init__(self, "({}<{})".format(n, arg._rep))
         self.__arg  = arg
         self.__weak = weak
+        self.__n = n
 
     def do_translate(self, ctx, step, data):
         """
@@ -419,11 +423,11 @@ class Previous(Formula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            if step > 0:
-                data.literal = self.__arg.translate(ctx, step-1)
+            if step >= self.__n:
+                data.literal = self.__arg.translate(ctx, step - self.__n)
             else:
                 data.literal = ctx.false_literal
-                if self.__weak and step == 0:
+                if self.__weak and step < self.__n:
                     data.literal = -data.literal
 
 class Initially(Formula):
@@ -467,18 +471,22 @@ class Next(Formula):
     Members:
     __arg  -- The argument of the next operator.
     __weak -- Whether this is a weak next operator.
+    __n    -- How many steps to look ahead.
     """
-    def __init__(self, arg, weak):
+    def __init__(self, arg, n, weak):
         """
         Initializes the formula.
 
         Arguments:
         arg  -- The argument of the next operator.
         weak -- Whether this is a weak next operator.
+        n    -- How many steps to look ahead.
         """
         Formula.__init__(self, "(>{})".format(arg._rep))
+        assert(n > 0)
         self.__arg  = arg
         self.__weak = weak
+        self.__n    = n
 
     def do_translate(self, ctx, step, data):
         """
@@ -502,8 +510,8 @@ class Next(Formula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            if step < ctx.horizon:
-                data.literal = self.__arg.translate(ctx, step+1)
+            if step + self.__n <= ctx.horizon:
+                data.literal = self.__arg.translate(ctx, step + self.__n)
                 data.done = True
             else:
                 data.literal = ctx.backend.add_atom()
@@ -512,11 +520,13 @@ class Next(Formula):
                 data.done = False
         elif not data.done:
             assert(step in range(0, ctx.horizon + 1))
-            if step < ctx.horizon:
-                arg = self.__arg.translate(ctx, step+1)
+            if step + self.__n <= ctx.horizon:
+                arg = self.__arg.translate(ctx, step + self.__n)
                 make_equal(ctx.backend, data.literal, arg)
                 ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
                 data.done = True
+            else:
+                ctx.add_todo(self._rep, self, step)
 
 class TelFormula(Formula):
     """
@@ -731,6 +741,13 @@ def create_atom(rep, theory, positive):
             return theory.add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
     raise RuntimeError("invalid atom: ".format(rep))
 
+def create_number(rep):
+    if rep.type == clingo.TheoryTermType.Number and rep.number >= 0:
+        return rep.number
+    # TODO: this case should be handled as in AG
+    #       the corresponding formula should evaluate to false
+    raise RuntimeError("number expected: ".format(rep))
+
 def create_formula(rep, theory):
     """
     Returns the temporal formula corresponding the given theory term.
@@ -753,35 +770,37 @@ def create_formula(rep, theory):
             arg = create_formula(args[0], theory)
             return theory.add_formula(Negation(arg))
         elif rep.name in _tel_operators:
-            lhs = None if len(args) == 1 else create_formula(args[0], theory)
             rhs = create_formula(args[-1], theory)
             if rep.name == "<" or rep.name == "<:":
-                return theory.add_formula(Previous(rhs, rep.name == "<:"))
-            elif rep.name == "<;" or rep.name == "<:;":
-                return theory.add_formula(BooleanFormula(BooleanFormula.And, Previous(lhs, rep.name == "<:;"), rhs))
+                lhs = 1 if len(args) == 1 else create_number(args[0])
+                return rhs if lhs == 0 else theory.add_formula(Previous(rhs, lhs, rep.name == "<:"))
+            elif rep.name == ">" or rep.name == ">:":
+                lhs = 1 if len(args) == 1 else create_number(args[0])
+                return rhs if lhs == 0 else theory.add_formula(Next(rhs, lhs, rep.name == ">:"))
+            lhs = None if len(args) == 1 else create_formula(args[0], theory)
+            if rep.name == "<;" or rep.name == "<:;":
+                return theory.add_formula(BooleanFormula(BooleanFormula.And, Previous(lhs, 1, rep.name == "<:;"), rhs))
             elif rep.name == "<*":
                 return theory.add_formula(TelFormulaP(TelFormula.Trigger, lhs, rhs))
             elif rep.name == "<?":
                 return theory.add_formula(TelFormulaP(TelFormula.Since, lhs, rhs))
             elif rep.name == "<<":
                 return theory.add_formula(Initially(rhs))
-            elif rep.name == ">" or rep.name == ">:":
-                return theory.add_formula(Next(rhs, rep.name == ">:"))
             elif rep.name == ";>" or rep.name == ";>:":
-                return theory.add_formula(BooleanFormula(BooleanFormula.And, lhs, Next(rhs, rep.name == ";>:")))
+                return theory.add_formula(BooleanFormula(BooleanFormula.And, lhs, Next(rhs, 1, rep.name == ";>:")))
             elif rep.name == ">*":
                 formula = theory.add_formula(TelFormulaN(TelFormula.Trigger, lhs, rhs))
-                formula.set_future(theory.add_formula(Next(formula, True)))
+                formula.set_future(theory.add_formula(Next(formula, 1, True)))
                 return formula
             elif rep.name == ">?":
                 formula = theory.add_formula(TelFormulaN(TelFormula.Since, lhs, rhs))
-                formula.set_future(theory.add_formula(Next(formula, False)))
+                formula.set_future(theory.add_formula(Next(formula, 1, False)))
                 return formula
             else:
                 assert(rep.name == ">>")
                 rhs = theory.add_formula(BooleanFormula(BooleanFormula.Or, theory.add_formula(Negation(theory.add_formula(Atom("__final", [], True)))), rhs))
                 formula = theory.add_formula(TelFormulaN(TelFormula.Trigger, None, rhs))
-                formula.set_future(theory.add_formula(Next(formula, True)))
+                formula.set_future(theory.add_formula(Next(formula, 1, True)))
                 return formula
         elif rep.name == "&":
             arg = rep.arguments[0]

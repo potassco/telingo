@@ -200,3 +200,51 @@ class TestMain(TestCase):
         self.assertEqual(solve("{b}. a. #program initial. :- not &tel {b ;>: b}.", imin=2), [['a(0)', 'a(1)', 'b(0)', 'b(1)'], ['a(0)', 'b(0)']])
         self.assertEqual(solve("{b}. a. #program final. :- not &tel {b <:; b}.", imin=2), [['a(0)', 'a(1)', 'b(0)', 'b(1)'], ['a(0)', 'b(0)']])
 
+    def test_assoc(self):
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< 4 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< 2 < 2 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < 2 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < 2 < < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< 2 < < 2 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < < b}."))
+
+    def test_previous(self):
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < b}."), [['a(0)', 'a(1)', 'a(2)', 'a(3)', 'b(0)']])
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {3 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {5 < b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {<: <: b}.", imin=3), [
+            ['a(0)'],
+            ['a(0)', 'a(1)'],
+            ['a(0)', 'a(1)', 'a(2)', 'b(0)'],
+            ['a(0)', 'a(1)', 'b(0)'],
+            ['a(0)', 'a(1)', 'b(1)'],
+            ['a(0)', 'b(0)']])
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {2 <: b}.", imin=3),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {<: <: b}.", imin=3))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {4 <: b}.", imin=5),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {<: <: <: <: b}.", imin=5))
+
+    def test_previous(self):
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {> > > b}."), [['a(0)', 'a(1)', 'a(2)', 'a(3)', 'b(3)']])
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {> > > b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {3 > b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {> > > > > b}."),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {5 > b}."))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {>: >: b}.", imin=3), [
+            ['a(0)'],
+            ['a(0)', 'a(1)'],
+            ['a(0)', 'a(1)', 'a(2)', 'b(2)'],
+            ['a(0)', 'a(1)', 'b(0)'],
+            ['a(0)', 'a(1)', 'b(1)'],
+            ['a(0)', 'b(0)']])
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {2 >: b}.", imin=3),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {>: >: b}.", imin=3))
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {4 >: b}.", imin=5),
+                         solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {>: >: >: >: b}.", imin=5))
+

@@ -558,19 +558,23 @@ def transform(inputs, callback):
     clingo.parse_program(dedent('''\
         #theory tel {
             formula  {
-                &   : 5, unary; % prefix for keywords
-                -   : 5, unary; % classical negation
-                ~   : 5, unary; % negation
-                <   : 5, unary; % previous
-                <:  : 5, unary; % weak previous
-                <?  : 5, unary; % eventually-
-                <*  : 5, unary; % always-
-                <<  : 5, unary; % initially
-                >   : 5, unary; % next
-                >:  : 5, unary; % weak next
-                >?  : 5, unary; % eventually+
-                >*  : 5, unary; % always+
-                >>  : 5, unary; % finally
+                &   : 5, unary;         % prefix for keywords
+                -   : 5, unary;         % classical negation
+                ~   : 5, unary;         % negation
+                <   : 5, unary;         % previous
+                <   : 5, binary, right; % n x previous
+                <:  : 5, unary;         % weak previous
+                <:  : 5, binary, right; % n x weak previous
+                <?  : 5, unary;         % eventually-
+                <*  : 5, unary;         % always-
+                <<  : 5, unary;         % initially
+                >   : 5, unary;         % next
+                >   : 5, binary, right; % n x next
+                >:  : 5, unary;         % weak next
+                >:  : 5, binary, right; % n x weak next
+                >?  : 5, unary;         % eventually+
+                >*  : 5, unary;         % always+
+                >>  : 5, unary;         % finally
                 >*  : 4, binary, left;  % release
                 >?  : 4, binary, left;  % until
                 <*  : 4, binary, left;  % trigger
