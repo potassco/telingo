@@ -76,8 +76,8 @@ second example below):
   - `<* b` (always before)
   - `a <? b` (since)
   - `<? b` (eventually before)
-  - `a <; b` (sequence: a & (< b))
-  - `a <:; b` (sequence: a & (<: b))
+  - `a <; b` (sequence: `a & (< b)`)
+  - `a <:; b` (sequence: `a & (<: b)`)
 - Formulas referring to the future
   - `> a` (next)
   - `>: a` (weak next)
@@ -85,8 +85,8 @@ second example below):
   - `>* b` (always after)
   - `a >? b` (until)
   - `>? b` (eventually after)
-  - `a ;> b` (sequence: a & (> b))
-  - `a ;>: b` (sequence: a & (>: b))
+  - `a ;> b` (sequence: `a & (> b)`)
+  - `a ;>: b` (sequence: `a & (>: b)`)
 - Formulas referring to the future
 - Other formulas
   - `&true` (Boolean constant true)
