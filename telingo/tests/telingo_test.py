@@ -248,3 +248,10 @@ class TestMain(TestCase):
         self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {4 >: b}.", imin=5),
                          solve("{b}. a. :- b, &tel { > >? b}.  #program initial. :- not &tel {>: >: >: >: b}.", imin=5))
 
+    def test_aggregate(self):
+        self.assertEqual(solve(":- &tel {}."), [])
+        self.assertEqual(solve(":- not &tel {}."), [[]])
+        self.assertEqual(solve("{a; b}. :- not &tel {a; b}."), [['a(0)', 'b(0)']])
+        self.assertEqual(
+            solve("{ p(1..3); q(1..3) }. :-        p(X) : q(X)."),
+            solve("{ p(1..3); q(1..3) }. :- &tel { p(X) : q(X) }."), [])

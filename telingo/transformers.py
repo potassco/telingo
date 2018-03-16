@@ -429,8 +429,10 @@ class ProgramTransformer(Transformer):
             if atom.term.name == "tel" :
                 if not self.__negation and not self.__constraint:
                     raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
-                if len(atom.elements) != 1 or len(atom.elements[0].condition):
-                    raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
+                for element in atom.elements:
+                    if len(element.tuple) != 1:
+                        raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
+                    self.visit(element.condition)
                 atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
             elif atom.term.name == "initial":
                 atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__initial", [time(atom.location)], False)))

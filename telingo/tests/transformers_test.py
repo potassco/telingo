@@ -158,9 +158,8 @@ class TestProgramTransformer(TestCase):
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "a :- &tel { a }.")
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
-        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a : a }.")
-        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { }.")
-        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a; b }.")
+        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a, a }.")
+        self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a; a, b }.")
 
 def transform(p):
     r = []

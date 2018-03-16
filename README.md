@@ -96,6 +96,9 @@ second example below):
   - `<< p` (initially: `<* (~ &initial | p)`)
   - `>> p` (finally: `>* (~ &final | p)`)
 
+The elements of &tel atoms are treated like conditional literals in clingo.
+The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`.
+
 ## Example I
 
 The following temporal program executes on of the `shoot`, `load`, or `wait`

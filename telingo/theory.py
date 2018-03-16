@@ -219,6 +219,40 @@ class Atom(Formula):
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
+class NumericLiteral(Formula):
+    """
+    An formula over a numeric literal.
+
+    Members:
+    __literal -- The numeric literal.
+    """
+    def __init__(self, literal):
+        """
+        Initializes the literal.
+
+        Arguments:
+        literal -- The numeric literal.
+        """
+        Formula.__init__(self, literal)
+        self.__literal = literal
+
+    def do_translate(self, ctx, step, data):
+        """
+        Translates the literal.
+
+        Works the same as Atom.do_translate except that we already have a
+        literal.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        data -- Step data associated with the step.
+        """
+        if data.literal is None:
+            assert(step in range(0, ctx.horizon + 1))
+            data.literal = self.__literal
+
+
 class BooleanConstant(Formula):
     """
     Formula capturing a Boolean constant.
@@ -516,7 +550,7 @@ class Next(Formula):
             else:
                 data.literal = ctx.backend.add_atom()
                 ctx.backend.add_external(data.literal, clingo.TruthValue._True if self.__weak else clingo.TruthValue._False)
-                ctx.add_todo(self._rep, self, step)
+                ctx.add_todo(self, step)
                 data.done = False
         elif not data.done:
             assert(step in range(0, ctx.horizon + 1))
@@ -526,7 +560,7 @@ class Next(Formula):
                 ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
                 data.done = True
             else:
-                ctx.add_todo(self._rep, self, step)
+                ctx.add_todo(self, step)
 
 class TelFormula(Formula):
     """
@@ -851,16 +885,15 @@ class Theory:
         formula = self.__formulas.setdefault(formula._rep, formula)
         return formula
 
-    def add_todo(self, key, formula, step):
+    def add_todo(self, formula, step):
         """
         Add the given formula to the todo list.
 
         Arguments:
-        key     -- Representation of the formula.
         formula -- The formula to add.
         step    -- The step at which to translate the formula.
         """
-        key = (step, key)
+        key = (step, formula._rep)
         if key not in self.__todo_keys:
             self.__todo_keys.add(key)
             self.__todo.append((step, formula))
@@ -877,6 +910,45 @@ class Theory:
             self.__false_literal = backend.add_atom()
         return self.__false_literal
 
+    def __translate_conjunction(self, formulas):
+        """
+        Return a formula corresponding to the conjunction of the given
+        formulas.
+
+        Arguments:
+        formulas -- List of temporal formulas.
+        """
+        if len(formulas) == 0:
+            return BooleanConstant(True)
+
+        formulas.sort(key=lambda x: x._rep)
+        formula = formulas[0]
+        for x in formulas[1:]:
+            formula = self.add_formula(BooleanFormula(BooleanFormula.And, formula, x))
+        return formula
+
+
+    def __translate_elements(self, elements):
+        """
+        Translate the given conjunction of elements and return a formula.
+
+        This translation is corresponds to the handling of conditional literals
+        in clingo. The difference is that here only the classical case is
+        supported.
+
+        Arguments:
+        elements -- List of theory elements.
+        """
+        formulas = []
+
+        for element in elements:
+            formulas.append(create_formula(element.terms[0], self))
+            if len(element.condition) > 0:
+                condition = self.__translate_conjunction([self.add_formula(NumericLiteral(literal)) for literal in element.condition])
+                formulas[-1] = self.add_formula(BooleanFormula(BooleanFormula.Ri, condition, formulas[-1]))
+
+        return self.__translate_conjunction(formulas)
+
     def translate(self, horizon, prg):
         """
         Translates the next step for the given horizon.
@@ -890,10 +962,9 @@ class Theory:
         for atom in prg.theory_atoms:
             if atom.term.name == "tel" and len(atom.term.arguments) == 1:
                 step    = atom.term.arguments[0].number
-                rep     = atom.elements[0].terms[0]
-                formula = create_formula(rep, self)
+                formula = self.__translate_elements(atom.elements)
                 formula.add_atom(atom.literal, step)
-                self.add_todo(str(rep), formula, step)
+                self.add_todo(formula, step)
 
         if len(self.__todo) > 0:
             todo, self.__todo, self.__todo_keys = self.__todo, [], set()
