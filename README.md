@@ -147,8 +147,8 @@ gun been shot (even though unloaded).
 
 The following example modifies the above program to encode that the gun breaks
 if there were two shots without loading the gun. Furthermore, its last
-integrity constraint selects traces where the loaded gun was not shoot because
-it is broken.
+integrity constraint selects traces where the loaded gun did not shoot because
+it broke.
 
 ```
 #program dynamic.
