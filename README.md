@@ -72,7 +72,7 @@ second example below):
 - Formulas referring to the past
   - `< a` (previous)
   - `<: a` (weak previous)
-  - `a <* b` (until)
+  - `a <* b` (trigger)
   - `<* b` (always before)
   - `a <? b` (since)
   - `<? b` (eventually before)
