@@ -33,11 +33,11 @@ clingo.
 
 # Input
 
-To refer to an atom in the previous state, the atom has to be prefixed with a
-prime, e.g. - `'p(1)`. To refer to an atom in the next state, the atom has to
-be suffixed with a prime, e.g. - `p(1)'`. An arbitrary number of primes can be
-used. If both leading and trailing primes are used then this is equivalent to
-removing the lesser amount of primes from both sides.
+To refer to an atom in the previous state, the atom name has to be prefixed
+with a prime, e.g. - `'p(1)`. To refer to an atom in the next state, the atom
+name has to be suffixed with a prime, e.g. - `p'(1)`. An arbitrary number of
+primes can be used. If both leading and trailing primes are used then this is
+equivalent to removing the lesser amount of primes from both sides.
 
 The `_` can be used as an initially operator. For example `_p` evaluates to
 true if `p` holds in the initial state. It can be used wherever past operators
