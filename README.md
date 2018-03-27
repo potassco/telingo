@@ -101,7 +101,7 @@ The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`.
 
 ## Example I
 
-The following temporal program executes on of the `shoot`, `load`, or `wait`
+The following temporal program executes one of the `shoot`, `load`, or `wait`
 actions in each time step and updates the `loaded` and `unloaded` fluents
 accordingly.
 
