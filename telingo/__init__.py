@@ -1,13 +1,20 @@
 """
 The telingo module contains functions to translate and solve temporal logic
 programs.
+
+Classes:
+Application -- Main application class.
+
+Functions:
+imain -- Function to run the incremetal solving loop.
+main  -- Main function starting an extended clingo application.
 """
 
-import sys
-import clingo
-import telingo.transformers as transformers
-import telingo.theory as theory
-from textwrap import dedent
+import sys as _sys
+import clingo as _clingo
+import telingo.transformers as _transformers
+import telingo.theory as _theory
+import textwrap as _textwrap
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
     """
@@ -36,7 +43,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
     """
-    f = theory.Theory()
+    f = _theory.Theory()
     step, ret = 0, None
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (
@@ -51,12 +58,12 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
                     (step - i == 0 and root_name == "initial")):
                     parts.append((part_name, [step - i, step]))
         if step > 0:
-            prg.release_external(clingo.Function("__final", [step-1]))
+            prg.release_external(_clingo.Function("__final", [step-1]))
             prg.cleanup()
 
         prg.ground(parts)
         f.translate(step, prg)
-        prg.assign_external(clingo.Function("__final", [step]), True)
+        prg.assign_external(_clingo.Function("__final", [step]), True)
         assumptions = []
         for name, arity, positive in future_sigs:
             for atom in prg.symbolic_atoms.by_signature(name, arity, positive):
@@ -123,19 +130,19 @@ class Application:
     def print_model(self, model, printer):
         table = {}
         for sym in model.symbols(shown=True):
-            if sym.type == clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1].number, []).append(clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
+            if sym.type == _clingo.SymbolType.Function and len(sym.arguments) > 0:
+                table.setdefault(sym.arguments[-1].number, []).append(_clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
         for step in range(self.__horizon+1):
             symbols = table.get(step, [])
-            sys.stdout.write(" State {}:".format(step))
+            _sys.stdout.write(" State {}:".format(step))
             sig = None
             for sym in sorted(symbols):
                 if not sym.name.startswith('__'):
                     if (sym.name, len(sym.arguments), sym.positive) != sig:
-                        sys.stdout.write("\n ")
+                        _sys.stdout.write("\n ")
                         sig = (sym.name, len(sym.arguments), sym.positive)
-                    sys.stdout.write(" {}".format(sym))
-            sys.stdout.write("\n".format(step))
+                    _sys.stdout.write(" {}".format(sym))
+            _sys.stdout.write("\n".format(step))
         return True
 
     def register_options(self, options):
@@ -145,7 +152,7 @@ class Application:
         group = "Telingo Options"
         options.add(group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
         options.add(group, "imax", "Maximum number of solving steps []", self.__parse_imax, argument="<n>")
-        options.add(group, "istop", dedent("""\
+        options.add(group, "istop", _textwrap.dedent("""\
             Stop criterion [sat]
                   <arg>: {sat|unsat|unknown}"""), self.__parse_istop)
 
@@ -159,8 +166,8 @@ class Application:
         with prg.builder() as b:
             files = [open(f) for f in files]
             if len(files) == 0:
-                files.append(sys.stdin)
-            future_sigs, program_parts = transformers.transform([f.read() for f in files], b.add)
+                files.append(_sys.stdin)
+            future_sigs, program_parts = _transformers.transform([f.read() for f in files], b.add)
 
         imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
 
@@ -168,4 +175,4 @@ def main():
     """
     Run the telingo application.
     """
-    sys.exit(int(clingo.clingo_main(Application("telingo"), sys.argv[1:])))
+    _sys.exit(int(_clingo.clingo_main(Application("telingo"), _sys.argv[1:])))
