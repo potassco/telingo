@@ -2,7 +2,7 @@
 Module with functions to transform heads referring to the future.
 """
 
-from transformer import *
+from .transformer import *
 from collections import namedtuple
 
 Atom = namedtuple("Atom", "location sign name arguments")
