@@ -8,42 +8,41 @@ from collections import namedtuple
 Atom = namedtuple("Atom", "location sign name arguments")
 Literal = namedtuple("Literal", "location sign formula")
 
-# first read the tel atoms into a data structure...
-
 class TheoryParser:
+    unary, binary = True, False
+    left,  right  = True, False
+    table = {
+        ("&"  , unary):  (5, None),
+        ("-"  , unary):  (5, None),
+        ("~"  , unary):  (5, None),
+        (">"  , unary):  (5, None),
+        (">"  , binary): (5, right),
+        (">:" , unary):  (5, None),
+        (">:" , binary): (5, right),
+        (">?" , unary):  (5, None),
+        (">*" , unary):  (5, None),
+        (">>" , unary):  (5, None),
+        (">*" , binary): (4, left),
+        (">?" , binary): (4, left),
+        ("&"  , binary): (3, left),
+        ("|"  , binary): (2, left),
+        (";>" , binary): (0, right),
+        (";>:", binary): (0, right) }
+
     def __init__(self):
         self.__stack  = []
-        unary, binary = True, False
-        left,  right  = True, False
-        self.__table  = {
-            ("&"  , unary):  (5, None),
-            ("-"  , unary):  (5, None),
-            ("~"  , unary):  (5, None),
-            (">"  , unary):  (5, None),
-            (">"  , binary): (5, right),
-            (">:" , unary):  (5, None),
-            (">:" , binary): (5, right),
-            (">?" , unary):  (5, None),
-            (">*" , unary):  (5, None),
-            (">>" , unary):  (5, None),
-            (">*" , binary): (4, left),
-            (">?" , binary): (4, left),
-            ("&"  , binary): (3, left),
-            ("|"  , binary): (2, left),
-            (";>" , binary): (0, right),
-            (";>:", binary): (0, right) }
 
     def __priority_and_associativity(self, operator):
         """
         Get priority and associativity of the given binary operator.
         """
-        return self.__table[(operator, False)]
+        return self.table[(operator, self.binary)]
 
     def __priority(self, operator, unary):
         """
         Get priority of the given unary or binary operator.
         """
-        return self.__table[(operator, unary)][0]
+        return self.table[(operator, unary)][0]
 
     def __check(self, operator):
         if len(self.__stack) < 2:
@@ -67,7 +66,7 @@ class TheoryParser:
         unary = True
         for element in x.elements:
             for operator in element.operators:
-                if not (operator, unary) in self.__table:
+                if not (operator, unary) in self.table:
                     raise RuntimeError("invalid operator in temporal formula: {}".format(str_location(x.location)))
                 while not unary and self.__check(operator):
                     self.__reduce()
