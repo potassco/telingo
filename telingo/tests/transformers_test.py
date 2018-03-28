@@ -156,8 +156,7 @@ class TestProgramTransformer(TestCase):
         self.assertEqual(transform_program("a :- not &tel { a }."), (['#program initial(__t,__u).', 'a(__t) :- not &tel(__t) { a :  }.'], set(), {}))
         self.assertEqual(transform_program("a :- not not &tel { a }."), (['#program initial(__t,__u).', 'a(__t) :- not not &tel(__t) { a :  }.'], set(), {}))
         self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "a :- &tel { a }.")
-        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
-        self.assertRaisesRegex(RuntimeError, "temporal formulas not supported", transform_program, "&tel { a } :- a.")
+        self.assertRaisesRegex(RuntimeError, "invalid operator in temporal formula", transform_program, "&tel { a -> b } :- a.")
         self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a, a }.")
         self.assertRaisesRegex(RuntimeError, "invalid temporal formula", transform_program, ":- &tel { a; a, b }.")
 

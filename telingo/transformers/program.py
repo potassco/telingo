@@ -6,6 +6,7 @@ ProgramTransformer -- Class to transform programs.
 """
 
 from telingo.transformers.term import *
+from telingo.transformers.head import *
 
 class ProgramTransformer(Transformer):
     """
@@ -39,6 +40,7 @@ class ProgramTransformer(Transformer):
         self.__normal = False
         self.__max_shift = [0]
         self.__term_transformer = TermTransformer(future_predicates)
+        self.__head_transformer = HeadTransformer()
         self.__constraint_parts = constraint_parts
 
     def __append_final(self, x, param=None):
@@ -133,13 +135,16 @@ class ProgramTransformer(Transformer):
             time = lambda loc: ast.Symbol(loc, clingo.Function(g_time_parameter_name))
             wrap = lambda loc, atom: ast.Literal(loc, ast.Sign.DoubleNegation, atom) if self.__head else atom
             if atom.term.name == "tel" :
-                if not self.__negation and not self.__constraint:
-                    raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
-                for element in atom.elements:
-                    if len(element.tuple) != 1:
-                        raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
-                    self.visit(element.condition)
-                atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
+                if self.__head:
+                    atom = self.__head_transformer.transform(atom)
+                else:
+                    if not self.__negation and not self.__constraint:
+                        raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
+                    for element in atom.elements:
+                        if len(element.tuple) != 1:
+                            raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
+                        self.visit(element.condition)
+                    atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
             elif atom.term.name == "initial":
                 atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__initial", [time(atom.location)], False)))
             elif atom.term.name == "final":
