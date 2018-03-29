@@ -123,4 +123,9 @@ class Transformer:
         else:
             raise TypeError("unexpected type")
 
+    def __call__(self, x, *args, **kwargs):
+        """
+        Alternative way to call visit.
+        """
+        return self.visit(x, *args, **kwargs)
 
