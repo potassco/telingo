@@ -256,6 +256,7 @@ class HeadFormulaTransformer(Transformer):
         if is_unary or is_binary:
             if x.name == "-":
                 return theory_term_to_atom(x, False)
+
             if is_unary:
                 lhs = None
                 rhs = self.visit(x.arguments[0])
@@ -312,6 +313,13 @@ class HeadTransformer:
         pass
 
     def transform(self, atom):
-        print (theory_atom_to_formula(atom))
+        formula = theory_atom_to_formula(atom)
+        rules = []
+        atom = None
+        # next grab the variables in the formula to create an auxiliary atom, which can be returned from the function
+        # then unpack the temporal operators in the formula
+        # then factor out the formula into disjunctive rules
+        # these rules have to be returned from the function too
         raise RuntimeError("implement me: transform")
+        return atom, rules
 
