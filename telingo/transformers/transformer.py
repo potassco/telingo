@@ -110,7 +110,7 @@ class Transformer:
         which are passed to node-specific visit functions and to the visit
         function called for child nodes.
         """
-        if isinstance(x, ast.AST):
+        if hasattr(x, "type"):
             attr = "visit_" + str(x.type)
             if hasattr(self, attr):
                 return getattr(self, attr)(x, *args, **kwargs)

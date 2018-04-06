@@ -4,13 +4,43 @@ Module with functions to transform heads referring to the future.
 
 import clingo
 from .transformer import *
-from collections import namedtuple
 
-Next = namedtuple("Next", "location lhs rhs weak")
-Until = namedtuple("Until", "location lhs rhs until")
-Atom = namedtuple("Atom", "location positive name arguments")
-Clause = namedtuple("Clause", "location elements conjunctive")
-Negation = namedtuple("Negation", "location rhs")
+def new_variant(name, fields, keys):
+    """
+    Creates a new Variant type, which can be visited with a Transformer.
+
+    Arguments:
+    name   -- The name of the variant.
+    fields -- The fields of the variants.
+    keys   -- The visitable fields of the variant.
+    """
+    class Variant:
+        __slots__  = fields
+        type       = name
+        child_keys = keys
+
+        def __init__(self, *args, **kwargs):
+            n = len(Variant.__slots__)
+            if len(args) + len(kwargs) != n:
+                raise TypeError("__init__ takes exactly {} arguments".format(n))
+            for key, val, i in zip(self.__slots__, args, range(n)):
+                setattr(self, key, val)
+                if key in kwargs:
+                    raise TypeError("argument given by name ({!r}) and position ({})".format(key, i+1))
+            for key, val in kwargs:
+                setattr(self, key, val)
+
+        def __repr__(self):
+            r = "{}({})".format(Variant.type, ", ".join((repr(getattr(self, key)) for key in Variant.__slots__)))
+            return r
+
+    return Variant
+
+TelNext = new_variant("TelNext", ["location", "lhs", "rhs", "weak"], ["lhs", "rhs"])
+TelUntil = new_variant("TelUntil", ["location", "lhs", "rhs", "until"], ["lhs", "rhs"])
+TelAtom = new_variant("TelAtom", ["location", "positive", "name", "arguments"], ["arguments"])
+TelClause = new_variant("TelClause", ["location", "elements", "conjunctive"], ["elements"])
+TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"])
 
 class TheoryParser:
     """
@@ -179,7 +209,7 @@ class HeadAtomTransformer(Transformer):
         """
         symbol = x.symbol
         if x.symbol.type == clingo.SymbolType.Function and len(symbol.name) > 0:
-            return Atom(x.location, positive != symbol.positive, symbol.name, [ast.Symbol(x.location, a) for a in symbol.arguments])
+            return TelAtom(x.location, positive != symbol.positive, symbol.name, [ast.Symbol(x.location, a) for a in symbol.arguments])
         else:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(str_location(x.location)))
 
@@ -207,7 +237,7 @@ class HeadAtomTransformer(Transformer):
         elif (x.name, TheoryParser.binary) in TheoryParser.table or (x.name, TheoryParser.unary) in TheoryParser.table:
             raise RuntimeError("invalid term: {}".format(str_location(x.location)))
         else:
-            return Atom(x.location, positive, x.name, [theory_term_to_term(a) for a in x.arguments])
+            return TelAtom(x.location, positive, x.name, [theory_term_to_term(a) for a in x.arguments])
 
     def visit_TheoryUnparsedTerm(self, x, positive):
         """
@@ -268,13 +298,13 @@ class HeadFormulaTransformer(Transformer):
                 rhs = self.visit(x.arguments[1])
 
             if x.name == ">" or x.name == ">:":
-                return Next(x.location, lhs, rhs, x.name == ">:")
+                return TelNext(x.location, lhs, rhs, x.name == ">:")
             elif x.name == "~":
                 return Negation(x.location, rhs)
             elif x.name == "&" and lhs is None:
                 raise RuntimeError("implement me: true, false, initial, final, ...")
             elif x.name == ">?" or x.name == ">*":
-                return Until(x.location, lhs, rhs, x.name == ">?")
+                return TelUntil(x.location, lhs, rhs, x.name == ">?")
             elif x.name == ">>":
                 raise RuntimeError("TODO: decide how to handle finally...")
             elif x.name == "&" or x.name == "|":
@@ -308,18 +338,58 @@ def theory_atom_to_formula(x):
     """
     return HeadFormulaTransformer()(x)
 
+class VariablesVisitor(Transformer):
+    """
+    Visitor to collect variables.
+
+    Attributes:
+    __variables -- reference to the resulting list of variables
+    """
+    def __init__(self, variables):
+        """
+        Initializes the visitor with a reference to a list for storing the
+        visited variables.
+        """
+        self.__variables = variables
+
+    def visit_Variable(self, x):
+        """
+        Stores the variable in the list.
+        """
+        self.__variables.append(x)
+        return x
+
+def get_variables(x):
+    """
+    Gets all variables in a formula.
+    """
+    v = []
+    VariablesVisitor(v)(x)
+    return v
+
 class HeadTransformer:
     def __init__(self):
-        pass
+        self.__num_aux = 0
+
+    def __aux_atom(self, location, variables):
+        self.__num_aux += 1
+        return ast.Literal(location, ast.Sign.NoSign, ast.SymbolicAtom(ast.Function(location, "__aux_{}".format(self.__num_aux - 1), variables, False)))
 
     def transform(self, atom):
         formula = theory_atom_to_formula(atom)
         rules = []
-        atom = None
-        # next grab the variables in the formula to create an auxiliary atom, which can be returned from the function
+        atom = self.__aux_atom(atom.location, get_variables(formula))
+        # in the first part boolean formulas can stay as is
+        print (formula, atom)
         # then unpack the temporal operators in the formula
+        #   this has to happen as in the translation notes
+        #   introducing auxiliary rules in dynamic/always programs
+        #   unpack works as follows
+        #     the rule is unpacked into a negated and non-negated part
+        #     the negated part is left as is
+        #     the non-negated part is unpacked further
         # then factor out the formula into disjunctive rules
-        # these rules have to be returned from the function too
+        #   these rules have to be returned from the function too
         raise RuntimeError("implement me: transform")
         return atom, rules
 
