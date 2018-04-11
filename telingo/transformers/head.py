@@ -46,16 +46,39 @@ def new_variant(name, fields, keys, tostring=None):
 
     return Variant
 
-def atom_str(atom):
-    args = "" if len(atom.arguments) == 0 else "({})".format(",".join(atom.arguments))
-    sign = "" if atom.positive else "-"
-    return "{}{}{}".format(sign, atom.name, args)
+def atom_str(x):
+    """
+    Converts a TelAtom to string.
+    """
+    args = "" if len(x.arguments) == 0 else "({})".format(",".join(map(str, x.arguments)))
+    sign = "" if x.positive else "-"
+    return "{}{}{}".format(sign, x.name, args)
 
-TelNext = new_variant("TelNext", ["location", "lhs", "rhs", "weak"], ["lhs", "rhs"])
-TelUntil = new_variant("TelUntil", ["location", "lhs", "rhs", "until"], ["lhs", "rhs"])
+def next_str(x):
+    op = ">:" if x.weak else ">"
+    lhs = "" if x.lhs is None else x.lhs
+    return "({}{}{})".format(lhs, op, x.rhs)
+
+def until_str(x):
+    op = ">?" if x.until else ">*"
+    lhs = "" if x.lhs is None else x.lhs
+    return "({}{}{})".format(lhs, op, x.rhs)
+
+def clause_str(x):
+    op = "&" if x.conjunctive else "|"
+    return "({})".format(op.join(map(str, x.elements)))
+
+def constant_str(x):
+    return "&true" if x.value else "&false"
+
+TelNext = new_variant("TelNext", ["location", "lhs", "rhs", "weak"], ["lhs", "rhs"], next_str)
+TelUntil = new_variant("TelUntil", ["location", "lhs", "rhs", "until"], ["lhs", "rhs"], until_str)
 TelAtom = new_variant("TelAtom", ["location", "positive", "name", "arguments"], ["arguments"], atom_str)
-TelClause = new_variant("TelClause", ["location", "elements", "conjunctive"], ["elements"])
-TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"], "~{rhs}")
+TelClause = new_variant("TelClause", ["location", "elements", "conjunctive"], ["elements"], clause_str)
+TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"], "(~{rhs})")
+TelConstant = new_variant("TelConstant", ["location", "value"], [], constant_str)
+
+g_tel_keywords = ["true", "false", "final"]
 
 class TheoryParser:
     """
@@ -70,8 +93,8 @@ class TheoryParser:
     unary, binary = True, False
     left,  right  = True, False
     table = {
-        ("&"  , unary):  (5, None),
-        ("-"  , unary):  (5, None),
+        ("&"  , unary):  (6, None),
+        ("-"  , unary):  (6, None),
         ("~"  , unary):  (5, None),
         (">"  , unary):  (5, None),
         (">"  , binary): (5, right),
@@ -315,17 +338,23 @@ class HeadFormulaTransformer(Transformer):
             if x.name == ">" or x.name == ">:":
                 return TelNext(x.location, lhs, rhs, x.name == ">:")
             elif x.name == "~":
-                return Negation(x.location, rhs)
+                return TelNegation(x.location, rhs)
             elif x.name == "&" and lhs is None:
-                raise RuntimeError("implement me: true, false, initial, final, ...")
+                if rhs.type != "TelAtom" or len(rhs.arguments) != 0 or rhs.name not in g_tel_keywords:
+                    raise RuntimeError("invalid temporal formula in rule head: {}".format(str_location(x.location)))
+                elif rhs.name == "false" or rhs.name == "true":
+                    return TelConstant(x.location, rhs.name == "true")
+                else:
+                    return TelAtom(x.location, True, "__final", [])
             elif x.name == ">?" or x.name == ">*":
                 return TelUntil(x.location, lhs, rhs, x.name == ">?")
             elif x.name == ">>":
+                # TODO: >* (~ &final | p))
                 raise RuntimeError("TODO: decide how to handle finally...")
             elif x.name == "&" or x.name == "|":
-                return Clause(x.location, [lhs, rhs], x.name == "&")
+                return TelClause(x.location, [lhs, rhs], x.name == "&")
             elif x.name == ";>" or x.name == ";>:":
-                raise RuntimeError("TODO: decide how to handle sequence...")
+                return TelClause(x.location, [lhs, TelNext(rhs.location, None, rhs, x.name == ";>:")], True)
             else:
                 raise RuntimeError("cannot happen")
         else:

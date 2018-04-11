@@ -150,8 +150,8 @@ def transform(inputs, callback):
     clingo.parse_program(dedent('''\
         #theory tel {
             formula  {
-                &   : 5, unary;         % prefix for keywords
-                -   : 5, unary;         % classical negation
+                &   : 6, unary;         % prefix for keywords
+                -   : 6, unary;         % classical negation
                 ~   : 5, unary;         % negation
                 <   : 5, unary;         % previous
                 <   : 5, binary, right; % n x previous
