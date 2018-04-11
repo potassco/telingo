@@ -5,19 +5,21 @@ Module with functions to transform heads referring to the future.
 import clingo
 from .transformer import *
 
-def new_variant(name, fields, keys):
+def new_variant(name, fields, keys, tostring=None):
     """
     Creates a new Variant type, which can be visited with a Transformer.
 
     Arguments:
-    name   -- The name of the variant.
-    fields -- The fields of the variants.
-    keys   -- The visitable fields of the variant.
+    name     -- The name of the variant.
+    fields   -- The fields of the variants.
+    keys     -- The visitable fields of the variant.
+    tostring -- Function or format string to convert the tuple into a string.
     """
     class Variant:
         __slots__  = fields
         type       = name
         child_keys = keys
+        __tostring = tostring
 
         def __init__(self, *args, **kwargs):
             n = len(Variant.__slots__)
@@ -34,13 +36,26 @@ def new_variant(name, fields, keys):
             r = "{}({})".format(Variant.type, ", ".join((repr(getattr(self, key)) for key in Variant.__slots__)))
             return r
 
+        def __str__(self):
+            if Variant.__tostring is None:
+                return self.__repr__()
+            elif callable(Variant.__tostring):
+                return Variant.__tostring(self)
+            else:
+                return Variant.__tostring.format(**{key: getattr(self, key) for key in Variant.__slots__})
+
     return Variant
+
+def atom_str(atom):
+    args = "" if len(atom.arguments) == 0 else "({})".format(",".join(atom.arguments))
+    sign = "" if atom.positive else "-"
+    return "{}{}{}".format(sign, atom.name, args)
 
 TelNext = new_variant("TelNext", ["location", "lhs", "rhs", "weak"], ["lhs", "rhs"])
 TelUntil = new_variant("TelUntil", ["location", "lhs", "rhs", "until"], ["lhs", "rhs"])
-TelAtom = new_variant("TelAtom", ["location", "positive", "name", "arguments"], ["arguments"])
+TelAtom = new_variant("TelAtom", ["location", "positive", "name", "arguments"], ["arguments"], atom_str)
 TelClause = new_variant("TelClause", ["location", "elements", "conjunctive"], ["elements"])
-TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"])
+TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"], "~{rhs}")
 
 class TheoryParser:
     """
@@ -209,7 +224,7 @@ class HeadAtomTransformer(Transformer):
         """
         symbol = x.symbol
         if x.symbol.type == clingo.SymbolType.Function and len(symbol.name) > 0:
-            return TelAtom(x.location, positive != symbol.positive, symbol.name, [ast.Symbol(x.location, a) for a in symbol.arguments])
+            return TelAtom(x.location, positive == symbol.positive, symbol.name, [ast.Symbol(x.location, a) for a in symbol.arguments])
         else:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(str_location(x.location)))
 
@@ -367,6 +382,21 @@ def get_variables(x):
     VariablesVisitor(v)(x)
     return v
 
+class ShiftTransformer(Transformer):
+    def __init__(self):
+        pass
+
+    def visit_TelNext(self, x):
+        raise RuntimeError("visit_TelNext: implement me...")
+
+    def visit_TelUntil(self, x):
+        raise RuntimeError("visit_TelUntil: implement me...")
+
+def shift_formula(x):
+    # TODO: probably have to return more here...
+    x = ShiftTransformer()(x)
+    return x
+
 class HeadTransformer:
     def __init__(self):
         self.__num_aux = 0
@@ -378,8 +408,10 @@ class HeadTransformer:
     def transform(self, atom):
         formula = theory_atom_to_formula(atom)
         rules = []
+        # a time parameter has to be attached to the atom
         atom = self.__aux_atom(atom.location, get_variables(formula))
         # in the first part boolean formulas can stay as is
+        shifted = shift_formula(formula)
         print (formula, atom)
         # then unpack the temporal operators in the formula
         #   this has to happen as in the translation notes
