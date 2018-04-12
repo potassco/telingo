@@ -349,8 +349,8 @@ class HeadFormulaTransformer(Transformer):
             elif x.name == ">?" or x.name == ">*":
                 return TelUntil(x.location, lhs, rhs, x.name == ">?")
             elif x.name == ">>":
-                # TODO: >* (~ &final | p))
-                raise RuntimeError("TODO: decide how to handle finally...")
+                c = TelClause(x.location, [TelAtom(x.location, True, "__final", []), rhs], False)
+                return TelUntil(x.location, None, c, False)
             elif x.name == "&" or x.name == "|":
                 return TelClause(x.location, [lhs, rhs], x.name == "&")
             elif x.name == ";>" or x.name == ";>:":

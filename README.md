@@ -87,7 +87,6 @@ second example below):
   - `>? b` (eventually after)
   - `a ;> b` (sequence: `a & (> b)`)
   - `a ;>: b` (sequence: `a & (>: b)`)
-- Formulas referring to the future
 - Other formulas
   - `&true` (Boolean constant true)
   - `&false` (`~ &true`)

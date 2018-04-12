@@ -53,4 +53,4 @@ class TestHead(TestCase):
         self.assertEqual(transform_formula("&true"), "&true")
         self.assertEqual(transform_formula("&false"), "&false")
         self.assertEqual(transform_formula("&final"), "__final")
-        # TODO: finally
+        self.assertEqual(transform_formula(">>a"), "(>*(__final|a))")
