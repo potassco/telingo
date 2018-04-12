@@ -25,6 +25,10 @@ def transform_atom(s, positive=True):
 def transform_formula(s):
     return str(th.theory_atom_to_formula(parse_formula(s)))
 
+def shift_formula(s):
+    f, r = th.shift_formula(th.theory_atom_to_formula(parse_formula(s)))
+    return str(f), list(map(str, r))
+
 class TestHead(TestCase):
     def test_atom(self):
         self.assertEqual(transform_atom("a"), "a")
@@ -57,3 +61,6 @@ class TestHead(TestCase):
 
     def test_variables(self):
         self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "[X, Y, Z]")
+
+    def test_shift(self):
+        self.assertEqual(shift_formula("a"), ("a", []))

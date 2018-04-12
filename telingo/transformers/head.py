@@ -424,7 +424,7 @@ class ShiftTransformer(Transformer):
 def shift_formula(x):
     # TODO: probably have to return more here...
     x = ShiftTransformer()(x)
-    return x
+    return x, []
 
 class HeadTransformer:
     def __init__(self):
