@@ -54,3 +54,6 @@ class TestHead(TestCase):
         self.assertEqual(transform_formula("&false"), "&false")
         self.assertEqual(transform_formula("&final"), "__final")
         self.assertEqual(transform_formula(">>a"), "(>*(__final|a))")
+
+    def test_variables(self):
+        self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "[X, Y, Z]")

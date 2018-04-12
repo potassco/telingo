@@ -400,16 +400,16 @@ class VariablesVisitor(Transformer):
         """
         Stores the variable in the list.
         """
-        self.__variables.append(x)
+        self.__variables[str(x)] = x
         return x
 
 def get_variables(x):
     """
     Gets all variables in a formula.
     """
-    v = []
+    v = {}
     VariablesVisitor(v)(x)
-    return v
+    return [val for _, val in sorted(v.items(), key=lambda x: x[0])]
 
 class ShiftTransformer(Transformer):
     def __init__(self):
