@@ -83,6 +83,8 @@ TelComparison = new_variant("TelComparison", ["location", "lhs", "operator", "rh
 
 g_tel_keywords = ["true", "false", "final"]
 
+# {{{1 parse_raw_formula
+
 class TheoryParser:
     """
     Parser for temporal formulas.
@@ -183,22 +185,12 @@ def parse_raw_formula(x):
     """
     return TheoryParser().parse(x)
 
-class HeadTermTransformer(Transformer):
+# {{{1 theory_term <-> term
+
+class TheoryTermToTermTransformer(Transformer):
     """
     This class transforms a given theory term into a plain term.
     """
-    def visit_Symbol(self, x):
-        """
-        Symbols are equally represented in terms and theory terms.
-        """
-        return x
-
-    def visit_Variable(self, x):
-        """
-        Variables are equally represented in terms and theory terms.
-        """
-        return x
-
     def visit_TheoryTermSequence(self, x):
         """
         Theory term tuples are mapped to term tuples.
@@ -227,13 +219,45 @@ class HeadTermTransformer(Transformer):
         """
         return self.visit(parse_raw_formula(x))
 
+class TermToTheoryTermTransformer(Transformer):
+    def visit_UnaryOperation(self, x):
+        if x.operator == ast.UnaryOperator.Minus:
+            return ast.TheoryFunction(x.location, "-", [self(x.argument)])
+        else:
+            raise RuntimeError("cannot convert unary operation to theory term: {}".format(str_location(x.location)))
+
+    def visit_Function(self, x):
+        if x.external:
+            raise RuntimeError("cannot convert external function to theory term: {}".format(str_location(x.location)))
+        if x.name == "":
+            return ast.TheorySequence(x.location, ast.TheorySequenceType.Tuple, self(x.arguments))
+        else:
+            return ast.TheoryFunction(x.location, x.name, self(x.arguments))
+
+    def visit_BinaryOperation(self, x):
+        raise RuntimeError("cannot convert binary operation to theory term: {}".format(str_location(x.location)))
+
+    def visit_Interval(self, x):
+        raise RuntimeError("cannot convert interval to theory term: {}".format(str_location(x.location)))
+
+    def visit_Pool(self, x):
+        raise RuntimeError("cannot convert pool to theory term: {}".format(str_location(x.location)))
+
 def theory_term_to_term(x):
     """
     Convert the given theory term into a term.
     """
-    return HeadTermTransformer()(x)
+    return TheoryTermToTermTransformer()(x)
 
-class HeadAtomTransformer(Transformer):
+def term_to_theory_term(x):
+    """
+    Convert the given term into a theory term.
+    """
+    return TermToTheoryTermTransformer()(x)
+
+# {{{1 theory_term <-> tel_atom
+
+class TheoryTermToTelAtomTransformer(Transformer):
     """
     Turns the given theory term into an atom.
     """
@@ -286,18 +310,30 @@ class HeadAtomTransformer(Transformer):
         """
         return self.visit(parse_raw_formula(x), positive)
 
-def theory_term_to_atom(x, positive=True):
+def theory_term_to_tel_atom(x, positive=True):
     """
     Convert the given theory term into an atom.
     """
-    return HeadAtomTransformer()(x, positive)
+    return TheoryTermToTelAtomTransformer()(x, positive)
 
-class HeadFormulaTransformer(Transformer):
+def tel_atom_to_theory_term(x, positive=True):
+    """
+    Convert the given tel atom into a theory term.
+    """
+    ret = clingo.ast.TheoryFunction(x.location, x.name, [term_to_theory_term(t) for t in x.arguments])
+    if positive != x.positive:
+        ret = clingo.ast.TheoryFunction(x.location, "-", [ret])
+
+    return ret
+
+# {{{1 theory_atom <-> tel_formula
+
+class TheoryAtomToTelFormulaTransformer(Transformer):
     """
     Transforms a theory atom into a temporal formula.
     """
     def visit_Symbol(self, x):
-        return theory_term_to_atom(x, True)
+        return theory_term_to_tel_atom(x, True)
 
     def visit_Variable(self, x, positive):
         """
@@ -326,7 +362,7 @@ class HeadFormulaTransformer(Transformer):
         is_unary  = (x.name, TheoryParser.unary) in TheoryParser.table and len(x.arguments) == 1
         if is_unary or is_binary:
             if x.name == "-":
-                return theory_term_to_atom(x, False)
+                return theory_term_to_tel_atom(x, False)
 
             if is_unary:
                 lhs = None
@@ -361,7 +397,7 @@ class HeadFormulaTransformer(Transformer):
             else:
                 raise RuntimeError("cannot happen")
         else:
-            return theory_term_to_atom(x)
+            return theory_term_to_tel_atom(x)
 
     def visit_TheoryAtomElement(self, x):
         """
@@ -383,7 +419,9 @@ def theory_atom_to_formula(x):
     """
     Transforms the given theory atom into a temporal formula.
     """
-    return HeadFormulaTransformer()(x)
+    return TheoryAtomToTelFormulaTransformer()(x)
+
+# {{{1 get_variables
 
 class VariablesVisitor(Transformer):
     """
@@ -414,6 +452,8 @@ def get_variables(x):
     VariablesVisitor(v)(x)
     return [val for _, val in sorted(v.items(), key=lambda x: x[0])]
 
+# {{{1 shift_tel_formula
+
 class ShiftTransformer(Transformer):
     def __init__(self, rules, aux):
         self.__rules = rules
@@ -430,6 +470,7 @@ class ShiftTransformer(Transformer):
         t_lhs = clingo.ast.BinaryOperation(loc, clingo.ast.BinaryOperator.Minus, t_lhs, sym(g_time_parameter_name))
         t_lhs = clingo.ast.BinaryOperation(loc, clingo.ast.BinaryOperator.Plus, t_lhs, var("__S"))
         current = TelClause(loc, [rhs, com(ast.ComparisonOperator.NotEqual)], False)
+
         # TODO: The double negated part should be represented as a normal theory atom,
         #       which requires quite some ceremony...
         future = TelClause(loc, [com(ast.ComparisonOperator.LessEqual)], False)
@@ -439,10 +480,12 @@ class ShiftTransformer(Transformer):
     def visit_TelUntil(self, x):
         raise RuntimeError("visit_TelUntil: implement me...")
 
-def shift_formula(x, aux):
+def shift_tel_formula(x, aux):
     rules = []
     x = ShiftTransformer(rules, aux)(x)
     return x, rules
+
+# {{{1 transform_head
 
 class HeadTransformer:
     def __init__(self):
@@ -458,7 +501,7 @@ class HeadTransformer:
         # a time parameter has to be attached to the atom
         atom = self.__aux_atom(atom.location, get_variables(formula))
         # in the first part boolean formulas can stay as is
-        shifted = shift_formula(formula)
+        shifted = shift_tel_formula(formula)
         print (formula, atom)
         # then unpack the temporal operators in the formula
         #   this has to happen as in the translation notes
