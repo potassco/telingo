@@ -26,7 +26,9 @@ def transform_formula(s):
     return str(th.theory_atom_to_formula(parse_formula(s)))
 
 def shift_formula(s):
-    f, r = th.shift_formula(th.theory_atom_to_formula(parse_formula(s)))
+    f = th.theory_atom_to_formula(parse_formula(s))
+    aux = th.TelAtom(f.location, True, "aux", [])
+    f, r = th.shift_formula(f, aux)
     return str(f), list(map(str, r))
 
 class TestHead(TestCase):
@@ -64,3 +66,6 @@ class TestHead(TestCase):
 
     def test_shift(self):
         self.assertEqual(shift_formula("a"), ("a", []))
+        l = '((1-__t)+__S)'
+        self.assertEqual(shift_formula(">a"), ('(({l}>=0)&(a|({l}!=0))&({l}<=0))'.format(l=l), []))
+        # TODO: test shifting of next and until

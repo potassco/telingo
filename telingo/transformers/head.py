@@ -65,6 +65,8 @@ def until_str(x):
     return "({}{}{})".format(lhs, op, x.rhs)
 
 def clause_str(x):
+    if len(x.elements) == 1:
+        return str(x.elements[0])
     op = "&" if x.conjunctive else "|"
     return "({})".format(op.join(map(str, x.elements)))
 
@@ -77,6 +79,7 @@ TelAtom = new_variant("TelAtom", ["location", "positive", "name", "arguments"], 
 TelClause = new_variant("TelClause", ["location", "elements", "conjunctive"], ["elements"], clause_str)
 TelNegation = new_variant("TelNegation", ["location", "rhs"], ["rhs"], "(~{rhs})")
 TelConstant = new_variant("TelConstant", ["location", "value"], [], constant_str)
+TelComparison = new_variant("TelComparison", ["location", "lhs", "operator", "rhs"], [], "({lhs}{operator}{rhs})")
 
 g_tel_keywords = ["true", "false", "final"]
 
@@ -412,19 +415,34 @@ def get_variables(x):
     return [val for _, val in sorted(v.items(), key=lambda x: x[0])]
 
 class ShiftTransformer(Transformer):
-    def __init__(self):
-        pass
+    def __init__(self, rules, aux):
+        self.__rules = rules
+        self.__aux = aux
 
     def visit_TelNext(self, x):
-        raise RuntimeError("visit_TelNext: implement me...")
+        loc = x.location
+        rhs = self(x.rhs)
+        sym = lambda v: clingo.ast.Symbol(loc, clingo.Function(v, []))
+        num = lambda v: clingo.ast.Symbol(loc, clingo.Number(v))
+        var = lambda v: clingo.ast.Variable(loc, v)
+        com = lambda v: TelComparison(loc, t_lhs, v, num(0))
+        t_lhs = num(1) if x.lhs is None else x.lhs
+        t_lhs = clingo.ast.BinaryOperation(loc, clingo.ast.BinaryOperator.Minus, t_lhs, sym(g_time_parameter_name))
+        t_lhs = clingo.ast.BinaryOperation(loc, clingo.ast.BinaryOperator.Plus, t_lhs, var("__S"))
+        current = TelClause(loc, [rhs, com(ast.ComparisonOperator.NotEqual)], False)
+        # TODO: The double negated part should be represented as a normal theory atom,
+        #       which requires quite some ceremony...
+        future = TelClause(loc, [com(ast.ComparisonOperator.LessEqual)], False)
+        past = TelClause(loc, [com(ast.ComparisonOperator.GreaterEqual)], False)
+        return TelClause(loc, [past, current, future], True)
 
     def visit_TelUntil(self, x):
         raise RuntimeError("visit_TelUntil: implement me...")
 
-def shift_formula(x):
-    # TODO: probably have to return more here...
-    x = ShiftTransformer()(x)
-    return x, []
+def shift_formula(x, aux):
+    rules = []
+    x = ShiftTransformer(rules, aux)(x)
+    return x, rules
 
 class HeadTransformer:
     def __init__(self):
