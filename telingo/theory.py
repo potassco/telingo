@@ -407,9 +407,14 @@ _binary_operators = {
     "->": BooleanFormula.Ri}
 
 """
-Map from unary Boolean connective strings to their ids.
+Set of unary Boolean operators.
 """
 _unary_operators = {"~"}
+
+"""
+Set of binary arithmetic operators.
+"""
+_arithmetic_operators = {"+", "-"}
 
 # Temporal Formulas {{{1
 
@@ -768,14 +773,25 @@ def create_atom(rep, theory, positive):
     if rep.type == _clingo.TheoryTermType.Symbol:
         return theory.add_formula(Atom(rep.name, [], positive))
     elif rep.type == _clingo.TheoryTermType.Function:
-        if rep.name == "-":
+        if rep.name == "-" and len(rep.arguments) == 1:
             return create_atom(rep.arguments[0], theory, not positive)
-        elif rep.name not in _binary_operators and rep.name not in _unary_operators and rep.name not in _tel_operators:
+        elif rep.name not in _binary_operators and rep.name not in _unary_operators and rep.name not in _tel_operators and rep.name not in _arithmetic_operators:
             return theory.add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
     raise RuntimeError("invalid atom: ".format(rep))
 
 def create_number(rep):
-    if rep.type == _clingo.TheoryTermType.Number and rep.number >= 0:
+    if rep.type == _clingo.TheoryTermType.Function:
+        args = rep.arguments
+        if rep.name == "-" and len(args) == 1:
+            return -create_number(rep.arguments[0])
+        if rep.name in _arithmetic_operators and len(args) == 2:
+            lhs = create_number(rep.arguments[0])
+            rhs = create_number(rep.arguments[1])
+            if rep.name == "+":
+                return lhs + rhs
+            elif rep.name == "-":
+                return lhs - rhs
+    elif rep.type == _clingo.TheoryTermType.Number and rep.number >= 0:
         return rep.number
     # TODO: this case should be handled as in AG
     #       the corresponding formula should evaluate to false

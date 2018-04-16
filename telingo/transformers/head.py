@@ -526,8 +526,14 @@ class ShiftTransformer(_tf.Transformer):
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var("__S"))
         current = TelClause(loc, [rhs, com(_ast.ComparisonOperator.NotEqual)], False)
 
+
+        #nxt = lambda v: TelNext(x.location, )
+        #neg = lambda v: TelNegation(x.location, v)
+
         # TODO: The double negated part should be represented as a normal theory atom,
         #       which requires quite some ceremony...
+        #       to implement the next operator I also need basic arithmetics in temporal formulas
+        #       addition and subtraction should be enough for now...
         future = TelClause(loc, [com(_ast.ComparisonOperator.LessEqual)], False)
         past = TelClause(loc, [com(_ast.ComparisonOperator.GreaterEqual)], False)
         return TelClause(loc, [past, current, future], True)

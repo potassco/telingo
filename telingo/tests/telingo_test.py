@@ -212,6 +212,10 @@ class TestMain(TestCase):
         self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< 2 < < 2 < b}."),
                          solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < < < < b}."))
 
+    def test_arith(self):
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {1+2 < b}."), [['a(0)', 'a(1)', 'a(2)', 'a(3)', 'b(0)']])
+        self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {-1+5-1 < b}."), [['a(0)', 'a(1)', 'a(2)', 'a(3)', 'b(0)']])
+
     def test_previous(self):
         self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {< < < b}."), [['a(0)', 'a(1)', 'a(2)', 'a(3)', 'b(0)']])
         self.assertEqual(solve("{b}. a. :- b, &tel { > >? b}.  #program final. :- not &tel {3 < b}."),

@@ -153,8 +153,10 @@ def transform(inputs, callback):
     _clingo.parse_program(_dedent('''\
         #theory tel {
             formula  {
-                &   : 6, unary;         % prefix for keywords
-                -   : 6, unary;         % classical negation
+                &   : 7, unary;         % prefix for keywords
+                -   : 7, unary;         % classical negation
+                +   : 6, binary, left;  % arithmetic +
+                -   : 6, binary, left;  % arithmetic -
                 ~   : 5, unary;         % negation
                 <   : 5, unary;         % previous
                 <   : 5, binary, right; % n x previous
