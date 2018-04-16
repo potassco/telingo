@@ -67,6 +67,7 @@ class TestMain(TestCase):
         self.assertEqual(solve("#program dynamic. p.", imin=2), [[], ['p(1)']])
 
     def test_theory_boolean(self):
+        self.assertEqual(solve('{p(-a,1+2,"test")}. q :- not &tel {p(-a,1+2,"test")}.'), [['p(-a,3,"test",0)'], ['q(0)']])
         self.assertEqual(solve("{p}. q :- not &tel {p}."), [['p(0)'], ['q(0)']])
         self.assertEqual(solve("{p}. q :- not &tel {p}. r :- not &tel {p}."), [['p(0)'], ['q(0)', 'r(0)']])
         self.assertEqual(solve('{p(1,a,(1,a),f(2,a),"test",#inf,#sup)}. q(0) :- not &tel {p(1,a,(1,a),f(2,a),"test",#inf,#sup)}.'), [['p(1,a,(1,a),f(2,a),"test",#inf,#sup,0)'], ['q(0,0)']])

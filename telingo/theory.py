@@ -745,6 +745,18 @@ def create_symbol(rep):
         return _clingo.Number(rep.number)
     elif rep.type in [_clingo.TheoryTermType.List, _clingo.TheoryTermType.Set]:
         raise RuntimeError("invalid symbol: {}".format(rep))
+    elif rep.type == _clingo.TheoryTermType.Function and rep.name in _arithmetic_operators:
+        if len(rep.arguments) == 1:
+            rhs = create_symbol(rep.arguments[0])
+            if rep.name == "-":
+                if rhs.type == _clingo.SymbolType.Number:
+                    return _clingo.Number(-rhs.number)
+                elif rhs.type == _clingo.SymbolType.Function and len(rep.name) > 0:
+                    return _clingo.Function(rhs.name, rhs.arguments, not rhs.positive)
+        elif len(rep.arguments) == 2:
+            return _clingo.Number(create_number(rep))
+
+        raise RuntimeError("invalid symbol: {}".format(rep))
     else:
         name = "" if rep.type == _clingo.TheoryTermType.Tuple else rep.name
         if name in _binary_operators or name in _unary_operators or name in _tel_operators:
