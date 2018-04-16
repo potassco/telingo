@@ -5,10 +5,14 @@ Classes:
 ProgramTransformer -- Class to transform programs.
 """
 
-from telingo.transformers.term import *
-from telingo.transformers.head import *
+from . import transformer as _tf
+from . import term as _tt
+from . import head as _th
 
-class ProgramTransformer(Transformer):
+import clingo as _clingo
+from clingo import ast as _ast
+
+class ProgramTransformer(_tf.Transformer):
     """
     Rewrites all temporal operators in a logic program.
 
@@ -39,13 +43,13 @@ class ProgramTransformer(Transformer):
         self.__negation = False
         self.__normal = False
         self.__max_shift = [0]
-        self.__term_transformer = TermTransformer(future_predicates)
-        self.__head_transformer = HeadTransformer()
+        self.__term_transformer = _tt.TermTransformer(future_predicates)
+        self.__head_transformer = _th.HeadTransformer()
         self.__constraint_parts = constraint_parts
 
     def __append_final(self, x, param=None):
         loc = x.location
-        x.body.append(clingo.ast.Literal(loc, clingo.ast.Sign.NoSign, clingo.ast.SymbolicAtom(clingo.ast.Function(loc, "__final", [clingo.ast.Symbol(loc, param)] if param is not None else [], False))));
+        x.body.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(loc, "__final", [_ast.Symbol(loc, param)] if param is not None else [], False))));
 
     def visit(self, x, *args, **kwargs):
         """
@@ -55,9 +59,9 @@ class ProgramTransformer(Transformer):
         The extension happens before the node is visited normally so the time
         parameter is added to the atom accordingly.
         """
-        if self.__final and isinstance(x, clingo.ast.AST) and hasattr(x, "body"):
+        if self.__final and isinstance(x, _ast.AST) and hasattr(x, "body"):
             self.__append_final(x)
-        ret = Transformer.visit(self, x, *args, **kwargs)
+        ret = _tf.Transformer.visit(self, x, *args, **kwargs)
         return ret
 
     def visit_Rule(self, rule):
@@ -69,14 +73,14 @@ class ProgramTransformer(Transformer):
         try:
             self.__head = True
             self.__max_shift = [0]
-            self.__constraint = is_constraint(rule)
-            self.__normal = is_normal(rule)
+            self.__constraint = _tf.is_constraint(rule)
+            self.__normal = _tf.is_normal(rule)
             rule.head = self.visit(rule.head)
             self.__head = False
             rule.body = self.visit(rule.body)
             if self.__max_shift[0] > 0 and not self.__final:
-                last = ast.Rule(rule.location, rule.head, rule.body[:])
-                self.__append_final(rule, clingo.Function(g_time_parameter_name_alt))
+                last = _ast.Rule(rule.location, rule.head, rule.body[:])
+                self.__append_final(rule, _clingo.Function(_tf.g_time_parameter_name_alt))
                 self.__constraint_parts.setdefault((self.__part, self.__max_shift[0]), []).append((rule, last))
                 return None
         finally:
@@ -92,8 +96,8 @@ class ProgramTransformer(Transformer):
         """
         head = self.__head
         try:
-            self.__negation = literal.sign != ast.Sign.NoSign
-            self.__head = self.__head and literal.sign == ast.Sign.NoSign
+            self.__negation = literal.sign != _ast.Sign.NoSign
+            self.__head = self.__head and literal.sign == _ast.Sign.NoSign
             return self.visit_children(literal)
         finally:
             self.__negation = False
@@ -131,28 +135,28 @@ class ProgramTransformer(Transformer):
         `__final`, and atoms of form `&true` and `&false` are rewritten to
         `#true` and `#false`.
         """
-        if atom.term.type == ast.ASTType.Function and len(atom.term.arguments) == 0:
-            time = lambda loc: ast.Symbol(loc, clingo.Function(g_time_parameter_name))
-            wrap = lambda loc, atom: ast.Literal(loc, ast.Sign.DoubleNegation, atom) if self.__head else atom
+        if atom.term.type == _ast.ASTType.Function and len(atom.term.arguments) == 0:
+            time = lambda loc: _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
+            wrap = lambda loc, atom: _ast.Literal(loc, _ast.Sign.DoubleNegation, atom) if self.__head else atom
             if atom.term.name == "tel" :
                 if self.__head:
                     atom = self.__head_transformer.transform(atom)
                 else:
                     if not self.__negation and not self.__constraint:
-                        raise RuntimeError("temporal formulas not supported in this context: {}".format(str_location(atom.location)))
+                        raise RuntimeError("temporal formulas not supported in this context: {}".format(_tf.str_location(atom.location)))
                     for element in atom.elements:
                         if len(element.tuple) != 1:
-                            raise RuntimeError("invalid temporal formula: {}".format(str_location(atom.location)))
+                            raise RuntimeError("invalid temporal formula: {}".format(_tf.str_location(atom.location)))
                         self.visit(element.condition)
                     atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)
             elif atom.term.name == "initial":
-                atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__initial", [time(atom.location)], False)))
+                atom = wrap(atom.location, _ast.SymbolicAtom(_ast.Function(atom.location, "__initial", [time(atom.location)], False)))
             elif atom.term.name == "final":
-                atom = wrap(atom.location, ast.SymbolicAtom(ast.Function(atom.location, "__final", [time(atom.location)], False)))
+                atom = wrap(atom.location, _ast.SymbolicAtom(_ast.Function(atom.location, "__final", [time(atom.location)], False)))
             elif atom.term.name == "true":
-                atom = wrap(atom.location, ast.BooleanConstant(True))
+                atom = wrap(atom.location, _ast.BooleanConstant(True))
             elif atom.term.name == "false":
-                atom = wrap(atom.location, ast.BooleanConstant(False))
+                atom = wrap(atom.location, _ast.BooleanConstant(False))
         return atom
 
     def visit_Program(self, prg):
@@ -167,8 +171,8 @@ class ProgramTransformer(Transformer):
             prg.name = "always"
         if prg.name == "base":
             prg.name = "initial"
-        prg.parameters.append(clingo.ast.Id(prg.location, g_time_parameter_name))
-        prg.parameters.append(clingo.ast.Id(prg.location, g_time_parameter_name_alt))
+        prg.parameters.append(_ast.Id(prg.location, _tf.g_time_parameter_name))
+        prg.parameters.append(_ast.Id(prg.location, _tf.g_time_parameter_name_alt))
         self.__part = prg.name
         return prg
 

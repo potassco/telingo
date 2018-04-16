@@ -1,4 +1,4 @@
-import telingo
+from . import main
 
 if __name__ == "__main__":
-    telingo.main()
+    main()

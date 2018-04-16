@@ -19,7 +19,7 @@ g_time_parameter_name_alt -- Prefix for the second time parameter used when
                              grounding rules within a given range.
 """
 
-import clingo.ast as ast
+from clingo import ast as _ast
 
 g_future_prefix = "__future_"
 g_variable_prefix = "X"
@@ -56,18 +56,18 @@ def is_constraint(s):
     As a special case this function also considers rules with a negative
     literal in the head as a constraint.
     """
-    return (s.type == ast.ASTType.Rule and s.head.type == ast.ASTType.Literal and
-            ((s.head.atom.type == ast.ASTType.BooleanConstant and not s.head.atom.value) or
-             (s.head.sign != ast.Sign.NoSign)))
+    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Literal and
+            ((s.head.atom.type == _ast.ASTType.BooleanConstant and not s.head.atom.value) or
+             (s.head.sign != _ast.Sign.NoSign)))
 
 def is_normal(s):
     """
     Check if the given statement is a normal rule.
     """
-    return (s.type == ast.ASTType.Rule and
-            s.head.type == ast.ASTType.Literal and
-            s.head.sign == ast.Sign.NoSign and
-            s.head.atom.type == ast.ASTType.SymbolicAtom)
+    return (s.type == _ast.ASTType.Rule and
+            s.head.type == _ast.ASTType.Literal and
+            s.head.sign == _ast.Sign.NoSign and
+            s.head.atom.type == _ast.ASTType.SymbolicAtom)
 
 def is_disjunction(s):
     """
@@ -75,7 +75,7 @@ def is_disjunction(s):
 
     Normal rules and constraints are not conisdered disjunctions.
     """
-    return (s.type == ast.ASTType.Rule and s.head.type == ast.ASTType.Disjunction)
+    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Disjunction)
 
 class Transformer:
     """

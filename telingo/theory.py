@@ -3,8 +3,7 @@ This module exports functions to translate (ground) theory atoms to rules via
 clingo's backend.
 """
 
-import clingo
-import clingo.ast as ast
+import clingo as _clingo
 
 # Base for Formulas {{{1
 
@@ -215,7 +214,7 @@ class Atom(Formula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            sym = clingo.Function(self.__name, self.__arguments + [step], self.__positive)
+            sym = _clingo.Function(self.__name, self.__arguments + [step], self.__positive)
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
@@ -549,7 +548,7 @@ class Next(Formula):
                 data.done = True
             else:
                 data.literal = ctx.backend.add_atom()
-                ctx.backend.add_external(data.literal, clingo.TruthValue._True if self.__weak else clingo.TruthValue._False)
+                ctx.backend.add_external(data.literal, _clingo.TruthValue._True if self.__weak else _clingo.TruthValue._False)
                 ctx.add_todo(self, step)
                 data.done = False
         elif not data.done:
@@ -557,7 +556,7 @@ class Next(Formula):
             if step + self.__n <= ctx.horizon:
                 arg = self.__arg.translate(ctx, step + self.__n)
                 make_equal(ctx.backend, data.literal, arg)
-                ctx.backend.add_external(data.literal, clingo.TruthValue.Free)
+                ctx.backend.add_external(data.literal, _clingo.TruthValue.Free)
                 data.done = True
             else:
                 ctx.add_todo(self, step)
@@ -737,23 +736,23 @@ def create_symbol(rep):
     Arguments:
     rep -- Theory term to translate.
     """
-    if rep.type == clingo.TheoryTermType.Number:
-        return clingo.Number(rep.number)
-    elif rep.type in [clingo.TheoryTermType.List, clingo.TheoryTermType.Set]:
+    if rep.type == _clingo.TheoryTermType.Number:
+        return _clingo.Number(rep.number)
+    elif rep.type in [_clingo.TheoryTermType.List, _clingo.TheoryTermType.Set]:
         raise RuntimeError("invalid symbol: {}".format(rep))
     else:
-        name = "" if rep.type == clingo.TheoryTermType.Tuple else rep.name
+        name = "" if rep.type == _clingo.TheoryTermType.Tuple else rep.name
         if name in _binary_operators or name in _unary_operators or name in _tel_operators:
             raise RuntimeError("invalid symbol: {}".format(rep))
-        args = [] if rep.type == clingo.TheoryTermType.Symbol else rep.arguments
+        args = [] if rep.type == _clingo.TheoryTermType.Symbol else rep.arguments
         if len(args) == 0:
             if name == "#inf":
-                return clingo.Infimum
+                return _clingo.Infimum
             elif name == "#sup":
-                return clingo.Supremum
+                return _clingo.Supremum
             elif len(name) > 1 and name.startswith('"') and name.endswith('"'):
-                return clingo.String(name[1:-1])
-        return clingo.Function(name, [create_symbol(arg) for arg in args])
+                return _clingo.String(name[1:-1])
+        return _clingo.Function(name, [create_symbol(arg) for arg in args])
 
 def create_atom(rep, theory, positive):
     """
@@ -766,9 +765,9 @@ def create_atom(rep, theory, positive):
     theory   -- The theory to which to add the atom.
     positive -- Boolean indicating the classical sign.
     """
-    if rep.type == clingo.TheoryTermType.Symbol:
+    if rep.type == _clingo.TheoryTermType.Symbol:
         return theory.add_formula(Atom(rep.name, [], positive))
-    elif rep.type == clingo.TheoryTermType.Function:
+    elif rep.type == _clingo.TheoryTermType.Function:
         if rep.name == "-":
             return create_atom(rep.arguments[0], theory, not positive)
         elif rep.name not in _binary_operators and rep.name not in _unary_operators and rep.name not in _tel_operators:
@@ -776,7 +775,7 @@ def create_atom(rep, theory, positive):
     raise RuntimeError("invalid atom: ".format(rep))
 
 def create_number(rep):
-    if rep.type == clingo.TheoryTermType.Number and rep.number >= 0:
+    if rep.type == _clingo.TheoryTermType.Number and rep.number >= 0:
         return rep.number
     # TODO: this case should be handled as in AG
     #       the corresponding formula should evaluate to false
@@ -792,9 +791,9 @@ def create_formula(rep, theory):
     rep    -- Theory term to translate.
     theory -- The theory to which to add the formula.
     """
-    if rep.type == clingo.TheoryTermType.Symbol:
+    if rep.type == _clingo.TheoryTermType.Symbol:
         return create_atom(rep, theory, True)
-    elif rep.type == clingo.TheoryTermType.Function:
+    elif rep.type == _clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in _binary_operators and len(args) == 2:
             lhs = create_formula(args[0], theory)
@@ -838,7 +837,7 @@ def create_formula(rep, theory):
                 return formula
         elif rep.name == "&":
             arg = rep.arguments[0]
-            if arg.type == clingo.TheoryTermType.Symbol:
+            if arg.type == _clingo.TheoryTermType.Symbol:
                 if arg.name == "initial" or arg.name == "final":
                     name = "__{}".format(arg.name)
                     return theory.add_formula(Atom(name, [], True))
@@ -933,7 +932,7 @@ class Theory:
         Translate the given conjunction of elements and return a formula.
 
         This translation is corresponds to the handling of conditional literals
-        in clingo. The difference is that here only the classical case is
+        in _clingo. The difference is that here only the classical case is
         supported.
 
         Arguments:

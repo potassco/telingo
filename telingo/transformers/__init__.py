@@ -66,9 +66,12 @@ Functions:
 transform -- transforms telingo programs into incremental ASP
 """
 
-from textwrap import dedent
-from telingo.transformers.transformer import *
-from telingo.transformers.program import *
+from . import transformer as _tf
+from . import program as _prg
+
+import clingo as _clingo
+from clingo import ast as _ast
+from textwrap import dedent as _dedent
 
 def transform(inputs, callback):
     """
@@ -87,67 +90,67 @@ def transform(inputs, callback):
                          'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
     future_predicates = set()
     constraint_parts  = {}
-    time              = ast.Symbol(loc, clingo.Function(g_time_parameter_name))
-    wrap_lit          = lambda a: ast.Literal(loc, ast.Sign.NoSign, a)
+    time              = _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
+    wrap_lit          = lambda a: _ast.Literal(loc, _ast.Sign.NoSign, a)
 
     # apply transformer to program
     def append(s):
         if s is not None:
             callback(s)
-    transformer = ProgramTransformer(future_predicates, constraint_parts)
+    transformer = _prg.ProgramTransformer(future_predicates, constraint_parts)
     for i in inputs:
-        clingo.parse_program(i, lambda s: append(transformer.visit(s)))
+        _clingo.parse_program(i, lambda s: append(transformer.visit(s)))
 
     # add auxiliary rules for future predicates
     future_sigs = []
     if len(future_predicates) > 0:
-        callback(ast.Program(loc, "always", [ast.Id(loc, g_time_parameter_name), ast.Id(loc, g_time_parameter_name_alt)]))
+        callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]))
         for name, arity, positive, shift in sorted(future_predicates):
-            variables = [ ast.Variable(loc, "{}{}".format(g_variable_prefix, i)) for i in range(arity) ]
-            s = ast.Symbol(loc, clingo.Number(shift))
-            t_shifted = ast.BinaryOperation(loc, ast.BinaryOperator.Plus, time, s)
-            add_sign = lambda lit: lit if positive else ast.UnaryOperation(loc, ast.UnaryOperator.Minus, lit)
-            p_current = ast.SymbolicAtom(add_sign(ast.Function(loc, name, variables + [time], False)))
-            f_current =  ast.SymbolicAtom(add_sign(ast.Function(loc, g_future_prefix + name, variables + [s, time], False)))
-            callback(ast.Rule(loc, wrap_lit(p_current), [wrap_lit(f_current)]))
-            future_sigs.append((g_future_prefix + name, arity + 2, positive))
+            variables = [ _ast.Variable(loc, "{}{}".format(_tf.g_variable_prefix, i)) for i in range(arity) ]
+            s = _ast.Symbol(loc, _clingo.Number(shift))
+            t_shifted = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, time, s)
+            add_sign = lambda lit: lit if positive else _ast.UnaryOperation(loc, _ast.UnaryOperator.Minus, lit)
+            p_current = _ast.SymbolicAtom(add_sign(_ast.Function(loc, name, variables + [time], False)))
+            f_current =  _ast.SymbolicAtom(add_sign(_ast.Function(loc, _tf.g_future_prefix + name, variables + [s, time], False)))
+            callback(_ast.Rule(loc, wrap_lit(p_current), [wrap_lit(f_current)]))
+            future_sigs.append((_tf.g_future_prefix + name, arity + 2, positive))
 
     # gather rules for constraints referring to the future
     reground_parts = []
     if len(constraint_parts) > 0:
         for (name, shift), rules in constraint_parts.items():
             assert(shift > 0)
-            params = [ast.Id(loc, g_time_parameter_name), ast.Id(loc, g_time_parameter_name_alt)]
+            params = [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]
             # parts to be regrounded
             part = "{}_0_{}".format(name, shift-1)
-            callback(ast.Program(loc, part, params))
+            callback(_ast.Program(loc, part, params))
             for p, l in rules:
                 callback(p)
             reground_parts.append((name, part, range(shift)))
             # parts that no longer have to be regrounded
             last_part = "{}_{}".format(name, shift)
-            callback(ast.Program(loc, last_part, params))
+            callback(_ast.Program(loc, last_part, params))
             for p, l in rules:
                 callback(l)
             reground_parts.append((name, last_part, range(shift, shift+1)))
 
     def add_part(part_name, atom_name, statement, wrap=lambda x: x):
-        params = [ast.Id(loc, g_time_parameter_name), ast.Id(loc, g_time_parameter_name_alt)]
-        callback(ast.Program(loc, part_name, params))
-        atom = wrap(ast.SymbolicAtom(ast.Function(loc, atom_name, [time], False)))
+        params = [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]
+        callback(_ast.Program(loc, part_name, params))
+        atom = wrap(_ast.SymbolicAtom(_ast.Function(loc, atom_name, [time], False)))
         callback(statement(loc, atom, []))
-    add_part('initial', '__initial', ast.Rule, wrap_lit)
-    add_part('always', '__final', ast.External)
+    add_part('initial', '__initial', _ast.Rule, wrap_lit)
+    add_part('always', '__final', _ast.External)
 
     reground_parts.append(('always',  'always',  range(1)))
     reground_parts.append(('dynamic', 'dynamic', range(1)))
     reground_parts.append(('initial', 'initial', range(1)))
 
     def no_program(s):
-        if s.type != ast.ASTType.Program:
+        if s.type != _ast.ASTType.Program:
             callback(s)
 
-    clingo.parse_program(dedent('''\
+    _clingo.parse_program(_dedent('''\
         #theory tel {
             formula  {
                 &   : 6, unary;         % prefix for keywords

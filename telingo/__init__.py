@@ -10,10 +10,11 @@ imain -- Function to run the incremetal solving loop.
 main  -- Main function starting an extended clingo application.
 """
 
+from . import transformers as _tf
+from . import theory as _ty
+
 import sys as _sys
 import clingo as _clingo
-import telingo.transformers as _transformers
-import telingo.theory as _theory
 import textwrap as _textwrap
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
@@ -43,7 +44,7 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
     """
-    f = _theory.Theory()
+    f = _ty.Theory()
     step, ret = 0, None
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (
@@ -167,7 +168,7 @@ class Application:
             files = [open(f) for f in files]
             if len(files) == 0:
                 files.append(_sys.stdin)
-            future_sigs, program_parts = _transformers.transform([f.read() for f in files], b.add)
+            future_sigs, program_parts = _tf.transform([f.read() for f in files], b.add)
 
         imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
 

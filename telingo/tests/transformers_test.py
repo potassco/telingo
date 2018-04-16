@@ -1,8 +1,11 @@
 import unittest
 import sys
 import clingo
-import clingo.ast as ast
-import telingo.transformers as transformers
+from clingo import ast
+import telingo.transformers as _tfs
+from telingo.transformers import transformer as _tf
+from telingo.transformers import term as _tt
+from telingo.transformers import program as _prg
 
 class TestCase(unittest.TestCase):
     def assertRaisesRegex(self, *args, **kwargs):
@@ -21,7 +24,7 @@ def parse_term(t):
 def transform_term(s, replace_future=False, fail_future=False, fail_past=False):
     a = set()
     m = [0]
-    t = transformers.TermTransformer(a)
+    t = _tt.TermTransformer(a)
     return str(t.visit(parse_term(s), replace_future, fail_future, fail_past, m)), a, m[0]
 
 class TestTermTransformer(TestCase):
@@ -66,7 +69,7 @@ def transform_program(p):
     a = set()
     c = {}
     ret = []
-    t = transformers.ProgramTransformer(a, c)
+    t = _prg.ProgramTransformer(a, c)
     def append(s):
         if s is not None:
             ret.append(str(s))
@@ -75,27 +78,27 @@ def transform_program(p):
 
 class TestClassify(TestCase):
     def test_constraint(self):
-        self.assertTrue(transformers.is_constraint(parse_rule(":-p.")))
-        self.assertTrue(transformers.is_constraint(parse_rule("#false :- p.")))
-        self.assertTrue(transformers.is_constraint(parse_rule("not q :- p.")))
-        self.assertTrue(transformers.is_constraint(parse_rule("not not q :- p.")))
-        self.assertFalse(transformers.is_constraint(parse_rule("p.")))
-        self.assertFalse(transformers.is_constraint(parse_rule("{p}.")))
-        self.assertFalse(transformers.is_constraint(parse_rule("a | b.")))
-        self.assertFalse(transformers.is_constraint(parse_rule("not a:#true.")))
+        self.assertTrue(_tf.is_constraint(parse_rule(":-p.")))
+        self.assertTrue(_tf.is_constraint(parse_rule("#false :- p.")))
+        self.assertTrue(_tf.is_constraint(parse_rule("not q :- p.")))
+        self.assertTrue(_tf.is_constraint(parse_rule("not not q :- p.")))
+        self.assertFalse(_tf.is_constraint(parse_rule("p.")))
+        self.assertFalse(_tf.is_constraint(parse_rule("{p}.")))
+        self.assertFalse(_tf.is_constraint(parse_rule("a | b.")))
+        self.assertFalse(_tf.is_constraint(parse_rule("not a:#true.")))
 
     def test_disjunction(self):
-        self.assertTrue(transformers.is_disjunction(parse_rule("a|b.")))
-        self.assertTrue(transformers.is_disjunction(parse_rule("a:#true.")))
-        self.assertFalse(transformers.is_disjunction(parse_rule("a.")))
-        self.assertFalse(transformers.is_disjunction(parse_rule(":-a.")))
+        self.assertTrue(_tf.is_disjunction(parse_rule("a|b.")))
+        self.assertTrue(_tf.is_disjunction(parse_rule("a:#true.")))
+        self.assertFalse(_tf.is_disjunction(parse_rule("a.")))
+        self.assertFalse(_tf.is_disjunction(parse_rule(":-a.")))
 
     def test_normal(self):
-        self.assertTrue(transformers.is_normal(parse_rule("a.")))
-        self.assertTrue(transformers.is_normal(parse_rule("a :- b.")))
-        self.assertFalse(transformers.is_normal(parse_rule("a:#true.")))
-        self.assertFalse(transformers.is_normal(parse_rule("not a.")))
-        self.assertFalse(transformers.is_normal(parse_rule("{a}.")))
+        self.assertTrue(_tf.is_normal(parse_rule("a.")))
+        self.assertTrue(_tf.is_normal(parse_rule("a :- b.")))
+        self.assertFalse(_tf.is_normal(parse_rule("a:#true.")))
+        self.assertFalse(_tf.is_normal(parse_rule("not a.")))
+        self.assertFalse(_tf.is_normal(parse_rule("{a}.")))
 
 class TestProgramTransformer(TestCase):
     def test_rule(self):
@@ -165,7 +168,7 @@ def transform(p):
     def append(s):
         if s.type != ast.ASTType.TheoryDefinition:
             r.append(str(s))
-    f, c = transformers.transform([p], append)
+    f, c = _tfs.transform([p], append)
     return r, f, c
 
 class TestTransform(unittest.TestCase):

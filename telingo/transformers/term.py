@@ -5,10 +5,12 @@ Classes:
 TermTransformer -- Class to transform terms.
 """
 
-import clingo
-from telingo.transformers.transformer import *
+from . import transformer as _tf
 
-class TermTransformer(Transformer):
+import clingo as _clingo
+from clingo import ast as _ast
+
+class TermTransformer(_tf.Transformer):
     """
     This class traverses the AST of a term until a Function is found. It then
     add a time parameter to its argument and optionally rewrites the and
@@ -85,36 +87,36 @@ class TermTransformer(Transformer):
         if n.startswith("_") and not n.startswith("__"):
             n = n[1:]
             if n.startswith("'") or name.startswith("'") or name.endswith("'"):
-                raise RuntimeError("initially operator cannot be used with primes: {}".format(str_location(location)))
+                raise RuntimeError("initially operator cannot be used with primes: {}".format(_tf.str_location(location)))
             initially = True
 
         finally_ = False
         if n.endswith("_") and not n.endswith("__"):
             n = n[:-1]
             if n.endswith("'") or name.startswith("'") or name.endswith("'"):
-                raise RuntimeError("finally operator cannot be used with primes: {}".format(str_location(location)))
+                raise RuntimeError("finally operator cannot be used with primes: {}".format(_tf.str_location(location)))
             finally_ = True
-            raise RuntimeError("finally operator not yet supported: {}".format(str_location(location)))
+            raise RuntimeError("finally operator not yet supported: {}".format(_tf.str_location(location)))
 
         if initially and finally_:
-            raise RuntimeError("finally and initially operator cannot used together: {}".format(str_location(location)))
+            raise RuntimeError("finally and initially operator cannot used together: {}".format(_tf.str_location(location)))
 
-        params = [clingo.ast.Symbol(location, clingo.Function(g_time_parameter_name))]
+        params = [_ast.Symbol(location, _clingo.Function(_tf.g_time_parameter_name))]
         if fail_future and (shift > 0 or finally_):
-            raise RuntimeError("future atoms not supported in this context: {}".format(str_location(location)))
+            raise RuntimeError("future atoms not supported in this context: {}".format(_tf.str_location(location)))
         if fail_past and (shift < 0 or initially):
-            raise RuntimeError("past atoms not supported in this context: {}".format(str_location(location)))
+            raise RuntimeError("past atoms not supported in this context: {}".format(_tf.str_location(location)))
         if shift > 0:
             if replace_future:
                 self.__future_predicates.add((n, arity, self.__positive, shift))
-                n = g_future_prefix + n
-                params.insert(0, clingo.ast.Symbol(location, shift))
+                n = _tf.g_future_prefix + n
+                params.insert(0, _ast.Symbol(location, shift))
             else:
                 max_shift[0] = max(max_shift[0], shift)
         if shift != 0:
-            params[-1] = clingo.ast.BinaryOperation(location, clingo.ast.BinaryOperator.Plus, params[-1], clingo.ast.Symbol(location, shift))
+            params[-1] = _ast.BinaryOperation(location, _ast.BinaryOperator.Plus, params[-1], _ast.Symbol(location, shift))
         elif initially:
-            params[-1] = clingo.ast.Symbol(location, 0)
+            params[-1] = _ast.Symbol(location, 0)
         return (n, params)
 
     def visit_UnaryOperation(self, term, *args, **kwargs):
@@ -146,5 +148,4 @@ class TermTransformer(Transformer):
         could occur in a valid AST.
         """
         raise RuntimeError("not implemented")
-
 
