@@ -42,6 +42,7 @@ def shift_formula(s):
 
 class TestHead(TestCase):
     def test_atom(self):
+        self.assertEqual(theory_term_to_tel_atom("a(1+2)"), "a((1+2))")
         self.assertEqual(theory_term_to_tel_atom("a"), "a")
         self.assertEqual(theory_term_to_tel_atom("-a"), "-a")
         self.assertEqual(theory_term_to_tel_atom("- -a"), "a")
@@ -51,6 +52,7 @@ class TestHead(TestCase):
         self.assertEqual(theory_term_to_tel_atom("a(X,x)"), "a(X,x)")
         self.assertEqual(theory_term_to_tel_atom("a(X,-x)"), "a(X,-x)")
 
+        self.assertEqual(tel_atom_to_theory_term("a(1+2)"), "a(+(1,2))")
         self.assertEqual(tel_atom_to_theory_term("a"), "a")
         self.assertEqual(tel_atom_to_theory_term("-a"), "-(a)")
         self.assertEqual(tel_atom_to_theory_term("- -a"), "a")

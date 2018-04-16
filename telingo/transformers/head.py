@@ -103,8 +103,10 @@ class TheoryParser:
     unary, binary = True, False
     left,  right  = True, False
     table = {
-        ("&"  , unary):  (6, None),
-        ("-"  , unary):  (6, None),
+        ("&"  , unary):  (7, None),
+        ("-"  , unary):  (7, None),
+        ("+"  , binary): (6, left),
+        ("-"  , binary): (6, left),
         ("~"  , unary):  (5, None),
         (">"  , unary):  (5, None),
         (">"  , binary): (5, right),
@@ -211,8 +213,12 @@ class TheoryTermToTermTransformer(_tf.Transformer):
 
         If the function name refers to a temporal operator, an exception is thrown.
         """
-        if x.name == "-":
+        if x.name == "-" and len(x.arguments) == 1:
             return _ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, self(x.arguments[0]))
+        elif x.name == "+" and len(x.arguments) == 2:
+            return _ast.BinaryOperation(x.location, _ast.BinaryOperator.Plus, self(x.arguments[0]), self(x.arguments[1]))
+        elif x.name == "-" and len(x.arguments) == 2:
+            return _ast.BinaryOperation(x.location, _ast.BinaryOperator.Minus, self(x.arguments[0]), self(x.arguments[1]))
         elif (x.name, TheoryParser.binary) in TheoryParser.table or (x.name, TheoryParser.unary) in TheoryParser.table:
             raise RuntimeError("invalid term: {}".format(_tf.str_location(x.location)))
         else:
@@ -240,7 +246,13 @@ class TermToTheoryTermTransformer(_tf.Transformer):
             return _ast.TheoryFunction(x.location, x.name, self(x.arguments))
 
     def visit_BinaryOperation(self, x):
-        raise RuntimeError("cannot convert binary operation to theory term: {}".format(_tf.str_location(x.location)))
+        if x.operator == _ast.BinaryOperator.Plus:
+            op = "+"
+        elif x.operator == _ast.BinaryOperator.Minus:
+            op = "-"
+        else:
+            raise RuntimeError("cannot convert binary operation to theory term: {}".format(_tf.str_location(x.location)))
+        return _ast.TheoryFunction(x.location, op, [self(x.left), self(x.right)])
 
     def visit_Interval(self, x):
         raise RuntimeError("cannot convert interval to theory term: {}".format(_tf.str_location(x.location)))
@@ -525,7 +537,6 @@ class ShiftTransformer(_tf.Transformer):
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, t_lhs, sym(_tf.g_time_parameter_name))
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var("__S"))
         current = TelClause(loc, [rhs, com(_ast.ComparisonOperator.NotEqual)], False)
-
 
         #nxt = lambda v: TelNext(x.location, )
         #neg = lambda v: TelNegation(x.location, v)
