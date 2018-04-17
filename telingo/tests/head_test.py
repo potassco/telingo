@@ -107,5 +107,6 @@ class TestHead(TestCase):
     def test_shift(self):
         self.assertEqual(shift_formula("a"), ("a", []))
         l = '((1-__t)+__S)'
-        self.assertEqual(shift_formula(">a"), ('(({l}>=0)&(a|({l}!=0))&({l}<=0))'.format(l=l), []))
-        # TODO: test shifting of next and until
+        m = '+(-(1,__t),__S)'
+        self.assertEqual(shift_formula(">a"), ('((~(~(<(-({m}),a)))|({l}>=0))&(a|({l}!=0))&(~(~(>({m},a)))|({l}<=0)))'.format(l=l, m=m), []))
+        # TODO: test shifting of until

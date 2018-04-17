@@ -87,6 +87,7 @@ TelComparison = new_variant("TelComparison", ["location", "lhs", "operator", "rh
 TelFormula = new_variant("TelFormula", ["location", "formula"], [], "{formula}")
 
 g_tel_keywords = ["true", "false", "final"]
+g_tel_shift_variable = "__S"
 
 # {{{1 parse_raw_formula
 
@@ -345,9 +346,9 @@ def tel_atom_to_theory_term(x, positive=True):
 
 # {{{1 theory_atom <-> tel_formula
 
-class TheoryAtomToFormulaTransformer(_tf.Transformer):
+class TheoryTermToFormulaTransformer(_tf.Transformer):
     """
-    Transforms a theory atom into a temporal formula.
+    Transforms a theory term into a temporal formula.
     """
     def visit_Symbol(self, x):
         return theory_term_to_tel_atom(x, True)
@@ -416,13 +417,17 @@ class TheoryAtomToFormulaTransformer(_tf.Transformer):
         else:
             return theory_term_to_tel_atom(x)
 
+class TheoryAtomToFormulaTransformer(_tf.Transformer):
+    """
+    Transforms a theory atom into a temporal formula.
+    """
     def visit_TheoryAtomElement(self, x):
         """
         Transforms one elementary theory elements without conditions into formulas.
         """
         if len(x.tuple) != 1 or len(x.condition) != 0:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        return self.visit(x.tuple[0])
+        return theory_term_to_formula(x.tuple[0])
 
     def visit_TheoryAtom(self, x):
         """
@@ -461,13 +466,19 @@ class FormulaToTheoryTermTransformer(_tf.Transformer):
         return _ast.TheoryFunction(x.location, "~", [formula_to_theory_term(x.rhs)])
 
     def visit_TelFormula(self, x):
-        return _ast.TheoryFunction(x.location, "~", [x.formula])
+        return x.formula
 
     def visit_TelConstant(self, x):
         return _ast.TheoryFunction(x.location, "&", [_ast.Symbol(x.location, _clingo.Function("true" if x.value else "false"))])
 
     def visit_TelComparison(self, x):
         raise RuntimeError("comparisons cannot be converted into theory terms: {}".format(_tf.str_location(x.location)))
+
+def theory_term_to_formula(x):
+    """
+    Transforms the given theory term into a temporal formula.
+    """
+    return TheoryTermToFormulaTransformer()(x)
 
 def theory_atom_to_formula(x):
     """
@@ -529,25 +540,24 @@ class ShiftTransformer(_tf.Transformer):
     def visit_TelNext(self, x):
         loc = x.location
         rhs = self(x.rhs)
+
         sym = lambda v: _ast.Symbol(loc, _clingo.Function(v, []))
         num = lambda v: _ast.Symbol(loc, _clingo.Number(v))
         var = lambda v: _ast.Variable(loc, v)
         com = lambda v: TelComparison(loc, t_lhs, v, num(0))
+
         t_lhs = num(1) if x.lhs is None else x.lhs
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, t_lhs, sym(_tf.g_time_parameter_name))
-        t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var("__S"))
-        current = TelClause(loc, [rhs, com(_ast.ComparisonOperator.NotEqual)], False)
+        t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var(g_tel_shift_variable))
 
-        #nxt = lambda v: TelNext(x.location, )
-        #neg = lambda v: TelNegation(x.location, v)
+        nxt = TelNext(x.location, term_to_theory_term(t_lhs), x.rhs, x.weak)
+        prv = TelFormula(x.location, _ast.TheoryFunction(x.location, "<", [term_to_theory_term(_ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, t_lhs)), formula_to_theory_term(x.rhs)]))
+        frm = lambda v: TelFormula(x.location, formula_to_theory_term(TelNegation(x.location, TelNegation(x.location, v))))
 
-        # TODO: The double negated part should be represented as a normal theory atom,
-        #       which requires quite some ceremony...
-        #       to implement the next operator I also need basic arithmetics in temporal formulas
-        #       addition and subtraction should be enough for now...
-        future = TelClause(loc, [com(_ast.ComparisonOperator.LessEqual)], False)
-        past = TelClause(loc, [com(_ast.ComparisonOperator.GreaterEqual)], False)
-        return TelClause(loc, [past, current, future], True)
+        cur = TelClause(loc, [rhs, com(_ast.ComparisonOperator.NotEqual)], False)
+        fut = TelClause(loc, [frm(nxt), com(_ast.ComparisonOperator.LessEqual)], False)
+        pst = TelClause(loc, [frm(prv), com(_ast.ComparisonOperator.GreaterEqual)], False)
+        return TelClause(loc, [pst, cur, fut], True)
 
     def visit_TelUntil(self, x):
         raise RuntimeError("visit_TelUntil: implement me...")
