@@ -97,9 +97,14 @@ def transform(inputs, callback):
     def append(s):
         if s is not None:
             callback(s)
-    transformer = _prg.ProgramTransformer(future_predicates, constraint_parts)
+    aux_rules = []
+    transformer = _prg.ProgramTransformer(future_predicates, constraint_parts, aux_rules)
     for i in inputs:
         _clingo.parse_program(i, lambda s: append(transformer.visit(s)))
+    if aux_rules:
+        callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name)]))
+        for rule in aux_rules:
+            callback(rule)
 
     # add auxiliary rules for future predicates
     future_sigs = []

@@ -48,6 +48,8 @@ def new_variant(name, fields, keys, tostring=None):
             else:
                 return Variant.__tostring.format(**{key: getattr(self, key) for key in Variant.__slots__})
 
+    Variant.__name__ = name
+
     return Variant
 
 def atom_str(x):
@@ -569,6 +571,23 @@ def shift_tel_formula(x, aux):
 
 # {{{1 transform_head
 
+def factor_out_tel_formula(x):
+    if x.type == "TelClause":
+        if x.conjunctive:
+            ret = []
+            for y in x.elements:
+                ret.extend(factor_out_tel_formula(y))
+        else:
+            ret = factor_out_tel_formula(x.elements[0])
+            for y in x.elements[1:]:
+                ret = [a + b for b in factor_out_tel_formula(y) for a in ret]
+        return ret
+    else:
+        return [[x]]
+
+def shift_clause(head, body):
+    raise RuntimeError("implement me: shift clause")
+
 class HeadTransformer:
     def __init__(self):
         self.__num_aux = 0
@@ -580,20 +599,18 @@ class HeadTransformer:
     def transform(self, atom):
         formula = theory_atom_to_formula(atom)
         rules = []
-        # a time parameter has to be attached to the atom
+        # TODO: a time parameter has to be attached to the atom
         atom = self.__aux_atom(atom.location, get_variables(formula))
-        # in the first part boolean formulas can stay as is
-        shifted = shift_tel_formula(formula, atom)
-        print (formula, atom)
-        # then unpack the temporal operators in the formula
-        #   this has to happen as in the translation notes
-        #   introducing auxiliary rules in dynamic/always programs
-        #   unpack works as follows
-        #     the rule is unpacked into a negated and non-negated part
-        #     the negated part is left as is
-        #     the non-negated part is unpacked further
-        # then factor out the formula into disjunctive rules
-        #   these rules have to be returned from the function too
-        raise RuntimeError("implement me: transform")
+        shifted, rules = shift_tel_formula(formula, atom)
+        for clause in factor_out_tel_formula(shifted):
+            head, body = [], []
+            # TODO: the aux atom has to be added to the body
+            for lit in clause:
+                shift_clause(head, body)
+            if len(head) == 1:
+                head = head[0]
+            else:
+                head = _ast.Disjunction(atom.location, [_ast.ConditionalLiteral(atom.location, x, []) for x in head])
+            rules.append(_ast.Rule(atom.location, head, body))
         return atom, rules
 

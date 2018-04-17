@@ -35,8 +35,10 @@ class ProgramTransformer(_tf.Transformer):
     __term_transformer -- The transformer used to rewrite terms.
     __constraint_parts -- Parts that have to be regrounded because of
                           constraints referring to the future.
+    __aux_rules        -- Auxiliary always quantified rules added during
+                          translation.
     """
-    def __init__(self, future_predicates, constraint_parts):
+    def __init__(self, future_predicates, constraint_parts, aux_rules):
         self.__final = False
         self.__head = False
         self.__constraint = False
@@ -46,6 +48,7 @@ class ProgramTransformer(_tf.Transformer):
         self.__term_transformer = _tt.TermTransformer(future_predicates)
         self.__head_transformer = _th.HeadTransformer()
         self.__constraint_parts = constraint_parts
+        self.__aux_rules        = aux_rules
 
     def __append_final(self, x, param=None):
         loc = x.location
@@ -140,7 +143,8 @@ class ProgramTransformer(_tf.Transformer):
             wrap = lambda loc, atom: _ast.Literal(loc, _ast.Sign.DoubleNegation, atom) if self.__head else atom
             if atom.term.name == "tel" :
                 if self.__head:
-                    atom = self.__head_transformer.transform(atom)
+                    atom, rules = self.__head_transformer.transform(atom)
+                    __aux_atom.extend(rules)
                 else:
                     if not self.__negation and not self.__constraint:
                         raise RuntimeError("temporal formulas not supported in this context: {}".format(_tf.str_location(atom.location)))

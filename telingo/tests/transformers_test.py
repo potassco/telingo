@@ -68,8 +68,9 @@ def parse_rule(r):
 def transform_program(p):
     a = set()
     c = {}
+    r = []
     ret = []
-    t = _prg.ProgramTransformer(a, c)
+    t = _prg.ProgramTransformer(a, c, r)
     def append(s):
         if s is not None:
             ret.append(str(s))
