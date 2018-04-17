@@ -437,7 +437,7 @@ class Previous(Formula):
         n    -- How many steps to look back.
         """
         assert(n > 0)
-        Formula.__init__(self, "({}<{})".format(n, arg._rep))
+        Formula.__init__(self, "({}{}{})".format(n, "<:" if weak else "<", arg._rep))
         self.__arg  = arg
         self.__weak = weak
         self.__n = n
@@ -520,7 +520,7 @@ class Next(Formula):
         weak -- Whether this is a weak next operator.
         n    -- How many steps to look ahead.
         """
-        Formula.__init__(self, "(>{})".format(arg._rep))
+        Formula.__init__(self, "({}{}{})".format(n, ">:" if weak else ">", arg._rep))
         assert(n > 0)
         self.__arg  = arg
         self.__weak = weak

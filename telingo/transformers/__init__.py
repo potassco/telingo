@@ -102,7 +102,7 @@ def transform(inputs, callback):
     for i in inputs:
         _clingo.parse_program(i, lambda s: append(transformer.visit(s)))
     if aux_rules:
-        callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name)]))
+        callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]))
         for rule in aux_rules:
             callback(rule)
 

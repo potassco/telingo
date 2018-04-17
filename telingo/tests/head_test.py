@@ -99,7 +99,7 @@ class TestHead(TestCase):
         self.assertEqual(formula_to_theory_term("&final"), "__final")
         self.assertEqual(formula_to_theory_term(">>a"), ">*(|(__final,a))")
 
-        self.assertEqual(formula_to_theory_atom(">a"), "&tel { >(a) :  }")
+        self.assertEqual(formula_to_theory_atom(">a"), "&tel(__t) { >(a) :  }")
 
     def test_variables(self):
         self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "[X, Y, Z]")

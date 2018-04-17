@@ -144,7 +144,7 @@ class ProgramTransformer(_tf.Transformer):
             if atom.term.name == "tel" :
                 if self.__head:
                     atom, rules = self.__head_transformer.transform(atom)
-                    __aux_atom.extend(rules)
+                    self.__aux_rules.extend(rules)
                 else:
                     if not self.__negation and not self.__constraint:
                         raise RuntimeError("temporal formulas not supported in this context: {}".format(_tf.str_location(atom.location)))

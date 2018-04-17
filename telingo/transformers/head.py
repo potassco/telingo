@@ -499,7 +499,7 @@ def theory_term_to_theory_atom(x):
     Transforms the given theory term (representing a formula) into a theory
     atom.
     """
-    return _ast.TheoryAtom(x.location, _ast.Symbol(x.location, _clingo.Function("tel")), [_ast.TheoryAtomElement([x], [])], None)
+    return _ast.TheoryAtom(x.location, _ast.Symbol(x.location, _clingo.Function("tel", [_clingo.Function(_tf.g_time_parameter_name)])), [_ast.TheoryAtomElement([x], [])], None)
 
 # {{{1 get_variables
 
@@ -539,16 +539,16 @@ class ShiftTransformer(_tf.Transformer):
         self.__rules = rules
         self.__aux = aux
 
-    def visit_TelNext(self, x):
+    def visit_TelNext(self, x, start):
         loc = x.location
-        rhs = self(x.rhs)
 
         sym = lambda v: _ast.Symbol(loc, _clingo.Function(v, []))
         num = lambda v: _ast.Symbol(loc, _clingo.Number(v))
         var = lambda v: _ast.Variable(loc, v)
-        com = lambda v: TelComparison(loc, t_lhs, v, num(0))
+        com = lambda v: TelComparison(loc, t_lhs, v, start)
 
         t_lhs = num(1) if x.lhs is None else x.lhs
+        rhs   = self(x.rhs, _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, start, t_lhs))
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, t_lhs, sym(_tf.g_time_parameter_name))
         t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var(g_tel_shift_variable))
 
@@ -566,7 +566,7 @@ class ShiftTransformer(_tf.Transformer):
 
 def shift_tel_formula(x, aux):
     rules = []
-    x = ShiftTransformer(rules, aux)(x)
+    x = ShiftTransformer(rules, aux)(x, _ast.Symbol(x.location, _clingo.Number(0)))
     return x, rules
 
 # {{{1 transform_head
@@ -585,28 +585,56 @@ def factor_out_tel_formula(x):
     else:
         return [[x]]
 
-def shift_clause(head, body):
-    raise RuntimeError("implement me: shift clause")
+def shift_literal(literal, head, body):
+    """
+    ~ ~ F ->     not &tel { F } # body
+    ~ F   -> not not &tel { F } # body
+    atom  -> atom               # head
+    a > b -> not a > b          # body
+
+    This should be everything!!!
+    """
+    if literal.type == "TelFormula":
+        n = 0
+        formula = literal.formula
+        while formula.type == _ast.ASTType.TheoryFunction and formula.name == "~":
+            formula = formula.arguments[0]
+            n += 1
+        assert(n > 0)
+        sign = _ast.Sign.Negation if n % 2 == 0 else _ast.Sign.DoubleNegation
+        body.append(_ast.Literal(literal.location, sign, theory_term_to_theory_atom(formula)))
+    elif literal.type == "TelAtom":
+        atom = _ast.Function(literal.location, literal.name, literal.arguments + [_ast.Symbol(literal.location, _clingo.Function(_tf.g_time_parameter_name))], False)
+        if not literal.positive:
+            atom = _ast.UnaryOperation(literal.location, _ast.UnaryOperator, atom)
+        head.append(_ast.Literal(literal.location, _ast.Sign.NoSign, _ast.SymbolicAtom(atom)))
+    elif literal.type == "TelComparison":
+        body.append(_ast.Literal(literal.location, _ast.Sign.Negation, _ast.Comparison(literal.operator, literal.lhs, literal.rhs)))
+    else:
+        raise RuntimeError("cannot happen")
 
 class HeadTransformer:
     def __init__(self):
         self.__num_aux = 0
 
-    def __aux_atom(self, location, variables):
-        self.__num_aux += 1
+    def __aux_atom(self, location, variables, inc=1):
+        self.__num_aux += inc
         return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, "__aux_{}".format(self.__num_aux - 1), variables, False)))
 
     def transform(self, atom):
         formula = theory_atom_to_formula(atom)
         rules = []
         # TODO: a time parameter has to be attached to the atom
-        atom = self.__aux_atom(atom.location, get_variables(formula))
+        variables = get_variables(formula)
+        atom  = self.__aux_atom(atom.location, variables + [_ast.Symbol(atom.location, _clingo.Function(_tf.g_time_parameter_name))])
+        batom = self.__aux_atom(atom.location, variables + [_ast.Variable(atom.location, g_tel_shift_variable)], inc=0)
         shifted, rules = shift_tel_formula(formula, atom)
         for clause in factor_out_tel_formula(shifted):
-            head, body = [], []
+            #print ([str(lit) for lit in clause])
+            head, body = [], [batom]
             # TODO: the aux atom has to be added to the body
             for lit in clause:
-                shift_clause(head, body)
+                shift_literal(lit, head, body)
             if len(head) == 1:
                 head = head[0]
             else:
