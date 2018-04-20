@@ -185,7 +185,9 @@ where we obtain `H` by rewriting the original rule into
 
 Note that it does not matter in which part the original rule occurs. Using the
 auxiliary predicate `s/1` and the ranges we only instantiate the necessary
-parts of the auxiliary programs. Further, note that this predicate is just 
+parts of the auxiliary programs. Further, note that this predicate is just here
+to stay in the input language of telingo. Using internal means it can be
+avoided.
 
 The `&tel` atom can then be translated on the propositional level after
 grounding by translating instantiations appearing in the grounding.
