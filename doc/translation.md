@@ -136,3 +136,70 @@ The following program again starts at step zero:
     b :- not c.
     a :- not c, not &tel { > (a >* b) }.
 
+# Second Try
+
+To get something running in reasonable time. I am going a simpler road than
+translating the formula on the nonground level.
+
+## Generating a domain that can be used for grounding.
+
+Given a `&tel` atom in a rule head, collect all positive atom occurrences in it
+and associate it with a range of time steps for which it can occur positively
+in a rule head.
+
+For example, for
+
+    > (a & >* b) & c :- B.
+
+we obtain the ranges
+
+    a: [1,2)
+    b: [1,*)
+    c: [0,1)
+
+We can then generate a program to instantiate the necessary domains for
+grounding without providing a translation for the `&tel` atom yet. Given the
+auxiliary program
+
+    #program initial.
+    s(0).
+    #program dynamic.
+    s(S) :- s(S-1).
+    #program always.
+    #external go. % ground only atom that never becomes true
+
+
+we write
+
+    #program always.
+    H(T) :- 'H(T).
+
+    { a } :- go, H(T), s(S), S+1 <= T, T < S+2.
+    { b } :- go, H(T), s(S), S+1 <= T.
+    { c } :- go, H(T), s(S), S   <= T, T < S+1.
+
+where we obtain `H` by rewriting the original rule into
+
+    H(T) :- B, s(T).
+    > (a & >* b) & c :- H(T).
+
+Note that it does not matter in which part the original rule occurs. Using the
+auxiliary predicate `s/1` and the ranges we only instantiate the necessary
+parts of the auxiliary programs. Further, note that this predicate is just 
+
+The `&tel` atom can then be translated on the propositional level after
+grounding by translating instantiations appearing in the grounding.
+
+## Translation
+
+The temporal formula is then unrolled at each step after grounding. At the top
+level, one level of next operators is removed and recursive operators are
+unrolled for one step. This results in a set of clauses which can then be
+shifted and added to the program providing the necessary derivations of atoms
+at each step.
+
+## Possible Optimizations
+
+It should be (relatively) easy to detect common structure in the clauses for
+which abbreviations can be introduced to keep the generated propositional
+formulas (more) compact.
