@@ -6,6 +6,7 @@ from . import transformer as _tf
 
 import clingo as _clingo
 from clingo import ast as _ast
+from numbers import Number as _Number
 
 # {{{ data structures
 
@@ -285,10 +286,23 @@ class TheoryTermToTermTransformer(_tf.Transformer):
 
         If the function name refers to a temporal operator, an exception is thrown.
         """
+        isnum = lambda y: y.type == _ast.ASTType.Symbol and y.symbol.type == _clingo.SymbolType.Number
         if x.name == "-" and len(x.arguments) == 1:
-            return _ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, self(x.arguments[0]))
-        elif x.name == "+" and len(x.arguments) == 2:
-            return _ast.BinaryOperation(x.location, _ast.BinaryOperator.Plus, self(x.arguments[0]), self(x.arguments[1]))
+            rhs = self(x.arguments[0])
+            if isnum(rhs):
+                return _ast.Symbol(x.location, _clingo.Number(-rhs.symbol.number))
+            else:
+                return _ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, rhs)
+        elif (x.name == "+" or x.name == "-") and len(x.arguments) == 2:
+            lhs = self(x.arguments[0])
+            rhs = self(x.arguments[1])
+            op  = _ast.BinaryOperator.Plus if x.name == "+" else _ast.BinaryOperator.Minus
+            if isnum(lhs) and isnum(rhs):
+                lhs = lhs.symbol.number
+                rhs = rhs.symbol.number
+                return _ast.Symbol(x.location, _clingo.Number(lhs + rhs if x.name == "+" else lhs - rhs))
+            else:
+                return _ast.BinaryOperation(x.location, op, lhs, rhs)
         elif x.name == "-" and len(x.arguments) == 2:
             return _ast.BinaryOperation(x.location, _ast.BinaryOperator.Minus, self(x.arguments[0]), self(x.arguments[1]))
         elif (x.name, TheoryParser.binary) in TheoryParser.table or (x.name, TheoryParser.unary) in TheoryParser.table:
@@ -386,40 +400,57 @@ def theory_term_to_atom(x, positive=True):
 
 # {{{1 theory transformers
 
-# TODO: reimplement me!!!
-
 class TheoryAtomTransformer(_tf.Transformer):
     """
     Transforms the given theory atom to be processed further.
     """
 
-    def __init__(self):
-        self.__atoms = []
+    def __init__(self, atoms):
+        self.__atoms = atoms
 
-    def visit_Symbol(self, x):
-        self.__atoms.append(theory_term_to_atom(x, True))
+    def __add_atom(self, x, rng):
+        self.__atoms.append((theory_term_to_atom(x), rng))
+
+    def __add_range(self, location, rng, left, right):
+        def add(a, b):
+            if a == 0:
+                return b
+            elif b == 0:
+                return a
+            elif a == float("inf") or b == float("inf"):
+                return float("inf")
+            elif isinstance(a, _Number) and isinstance(b, _Number):
+                return a + b
+            else:
+                lhs = _ast.Symbol(location, _clingo.Number(a)) if isinstance(a, _Number) else a
+                rhs = _ast.Symbol(location, _clingo.Number(b)) if isinstance(b, _Number) else b
+                return _clingo.ast.BinaryOperation(location, _ast.BinaryOperator.Plus, lhs, rhs)
+
+        return add(left, rng[0]), add(right, rng[1])
+
+    def visit_Symbol(self, x, rng):
+        self.__add_atom(x, rng)
         return x
 
-    def visit_Variable(self, x, positive):
+    def visit_Variable(self, x, rng):
         """
         Raises an error.
         """
         raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
 
-
-    def visit_TheoryTermSequence(self, x, positive):
+    def visit_TheoryTermSequence(self, x, rng):
         """
         Raises an error.
         """
         raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
 
-    def visit_TheoryUnparsedTerm(self, x):
+    def visit_TheoryUnparsedTerm(self, x, rng):
         """
         Unparsed terms are first parsed and then handled by the transformer.
         """
-        return self.visit(parse_raw_formula(x))
+        return self.visit(parse_raw_formula(x), rng)
 
-    def visit_TheoryFunction(self, x):
+    def visit_TheoryFunction(self, x, rng):
         """
         Transforms the given theory function into a temporal formula.
         """
@@ -427,42 +458,39 @@ class TheoryAtomTransformer(_tf.Transformer):
         is_unary  = (x.name, TheoryParser.unary) in TheoryParser.table and len(x.arguments) == 1
         if is_unary or is_binary:
             if x.name == "-":
-                return theory_term_to_tel_atom(x, False)
+                self.__add_atom(x, rng)
+                return x
+            elif x.name == "~":
+                return x
 
-            if is_unary:
-                lhs = None
-                rhs = self.visit(x.arguments[0])
-            else:
-                if x.name == ">" or x.name == ">:":
-                    lhs = theory_term_to_term(x.arguments[0])
-                else:
-                    lhs = self.visit(x.arguments[0])
-                rhs = self.visit(x.arguments[1])
+            lhs = None if is_unary else x.arguments[0]
+            rhs = x.arguments[0 if is_unary else 1]
 
             if x.name == ">" or x.name == ">:":
-                return TelNext(x.location, lhs, rhs, x.name == ">:")
-            elif x.name == "~":
-                return TelNegation(x.location, rhs)
-            elif x.name == "&" and lhs is None:
-                if rhs.type != "TelAtom" or len(rhs.arguments) != 0 or rhs.name not in g_tel_keywords:
-                    raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-                elif rhs.name == "false" or rhs.name == "true":
-                    return TelConstant(x.location, rhs.name == "true")
+                if lhs is None:
+                    lhs = 1
                 else:
-                    return TelAtom(x.location, True, "__final", [])
-            elif x.name == ">?" or x.name == ">*":
-                return TelUntil(x.location, lhs, rhs, x.name == ">?")
-            elif x.name == ">>":
-                c = TelClause(x.location, [TelAtom(x.location, True, "__final", []), rhs], False)
-                return TelUntil(x.location, None, c, False)
-            elif x.name == "&" or x.name == "|":
-                return TelClause(x.location, [lhs, rhs], x.name == "&")
-            elif x.name == ";>" or x.name == ";>:":
-                return TelClause(x.location, [lhs, TelNext(rhs.location, None, rhs, x.name == ";>:")], True)
+                    lhs = theory_term_to_term(x.arguments[0])
+                    if lhs.type == _ast.ASTType.Symbol and lhs.symbol.type == _clingo.SymbolType.Number:
+                        lhs = lhs.symbol.number
+                self(rhs, self.__add_range(x.location, rng, lhs, lhs))
+            elif x.name == "&" and lhs is None:
+                if rhs.type != _ast.ASTType.Symbol or len(rhs.symbol.arguments) != 0 or rhs.symbol.name not in g_tel_keywords:
+                    raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
             else:
-                raise RuntimeError("cannot happen")
+                rng_left, rng_right = rng, rng
+                if x.name == ">?" or x.name == ">*" or x.name == ">>":
+                    rng_left = self.__add_range(x.location, rng, 0, float("inf"))
+                    rng_right = rng_left
+                elif x.name == ";>" or x.name == ";>:":
+                    rng_right = self.__add_range(x.location, rng, 1, 1)
+                if is_binary:
+                    self(lhs, rng_left)
+                self(rhs, rng_right)
         else:
-            return theory_term_to_tel_atom(x)
+            self.__add_atom(x, rng)
+
+        return x
 
     def visit_TheoryAtomElement(self, x):
         """
@@ -470,7 +498,8 @@ class TheoryAtomTransformer(_tf.Transformer):
         """
         if len(x.tuple) != 1 or len(x.condition) != 0:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        return theory_term_to_formula(x.tuple[0])
+        x.tuple[0] = self(x.tuple[0], (0, 0))
+        return x
 
     def visit_TheoryAtom(self, x):
         """
@@ -480,13 +509,23 @@ class TheoryAtomTransformer(_tf.Transformer):
         """
         if len(x.elements) != 1 or x.guard is not None:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        return self.visit(x.elements[0])
+        x.term.name = "tel_head"
+        x.elements[0] = self(x.elements[0])
+        return x
 
 def transform_theory_atom(x):
     """
-    Transforms the given theory term into a temporal formula.
+    Transforms the given theory atom.
     """
-    return TheoryTermToFormulaTransformer()(x)
+    atoms = []
+    atom = TheoryAtomTransformer(atoms)(x)
+    # TODO: the atom should be grouped by ranges here
+    # separate numeric from non-numeric ranges
+    # group by atom and join numeric ranges using the interval set
+    # convert numbers to symbols
+    # finall group by ranges
+
+    return atom, atoms
 
 # {{{1 get_variables
 

@@ -2,6 +2,7 @@ import unittest
 import sys
 import clingo
 import telingo
+from numbers import Number
 from telingo.transformers import head as th
 
 class TestCase(unittest.TestCase):
@@ -22,9 +23,15 @@ def parse_atom(s):
 def theory_term_to_atom(s, positive=True):
     return str(th.theory_term_to_atom(parse_atom(s), positive))
 
+def transform_theory_atom(s):
+    atom, atoms = th.transform_theory_atom(parse_formula(s))
+    tostr = lambda x: x if isinstance(x, Number) else str(x)
+    return (str(atom), [(str(a), (tostr(l), tostr(r))) for a, (l, r) in atoms])
+
 class TestHead(TestCase):
     def test_atom(self):
-        self.assertEqual(theory_term_to_atom("a(1+2)"), "a((1+2))")
+        self.assertEqual(theory_term_to_atom("a(1+2)"), "a(3)")
+        self.assertEqual(theory_term_to_atom("a(1+a)"), "a((1+a))")
         self.assertEqual(theory_term_to_atom("a"), "a")
         self.assertEqual(theory_term_to_atom("-a"), "-a")
         self.assertEqual(theory_term_to_atom("- -a"), "a")
@@ -35,45 +42,26 @@ class TestHead(TestCase):
         self.assertEqual(theory_term_to_atom("a(X,-x)"), "a(X,-x)")
 
     def test_formula(self):
-        """
-        self.assertEqual(theory_atom_to_formula(">a"), "(>a)")
-        self.assertEqual(theory_atom_to_formula(">:a"), "(>:a)")
-        self.assertEqual(theory_atom_to_formula("2>a"), "(2>a)")
-        self.assertEqual(theory_atom_to_formula("(-2)>a"), "(-2>a)")
-        self.assertEqual(theory_atom_to_formula("-2>a"), "(-2>a)")
-        self.assertEqual(theory_atom_to_formula("a>?b"), "(a>?b)")
-        self.assertEqual(theory_atom_to_formula("a>*b"), "(a>*b)")
-        self.assertEqual(theory_atom_to_formula("~a"), "(~a)")
-        self.assertEqual(theory_atom_to_formula("~ ~a"), "(~(~a))")
-        self.assertEqual(theory_atom_to_formula("a & b"), "(a&b)")
-        self.assertEqual(theory_atom_to_formula("a | b"), "(a|b)")
-        self.assertEqual(theory_atom_to_formula("a ;> b"), "(a&(>b))")
-        self.assertEqual(theory_atom_to_formula("a ;>: b"), "(a&(>:b))")
-        self.assertEqual(theory_atom_to_formula("&true"), "&true")
-        self.assertEqual(theory_atom_to_formula("&false"), "&false")
-        self.assertEqual(theory_atom_to_formula("&final"), "__final")
-        self.assertEqual(theory_atom_to_formula(">>a"), "(>*(__final|a))")
+        inf = float("inf")
+        self.assertEqual(transform_theory_atom(">a"), ('&tel_head { >(a) :  }', [('a', (1, 1))]))
+        self.assertEqual(transform_theory_atom(">:a"), ('&tel_head { >:(a) :  }', [('a', (1, 1))]))
+        self.assertEqual(transform_theory_atom("2>a"), ('&tel_head { >(2,a) :  }', [('a', (2L, 2L))]))
+        self.assertEqual(transform_theory_atom("(-2)>a"), ('&tel_head { >((- 2),a) :  }', [('a', (-2L, -2L))]))
+        self.assertEqual(transform_theory_atom("a>?b"), ('&tel_head { >?(a,b) :  }', [('a', (0, inf)), ('b', (0, inf))]))
+        self.assertEqual(transform_theory_atom("> (a >? > b)"), ('&tel_head { >((a >? > b)) :  }', [('a', (1, inf)), ('b', (2, inf))]))
+        self.assertEqual(transform_theory_atom("~a"), ('&tel_head { ~(a) :  }', []))
+        self.assertEqual(transform_theory_atom("~ ~a"), ('&tel_head { ~(~(a)) :  }', []))
+        self.assertEqual(transform_theory_atom("a & b"), ('&tel_head { &(a,b) :  }', [('a', (0, 0)), ('b', (0, 0))]))
+        self.assertEqual(transform_theory_atom("a | b"), ('&tel_head { |(a,b) :  }', [('a', (0, 0)), ('b', (0, 0))]))
+        self.assertEqual(transform_theory_atom("a ;> b"), ('&tel_head { ;>(a,b) :  }', [('a', (0, 0)), ('b', (1, 1))]))
+        self.assertEqual(transform_theory_atom("a ;>: b"), ('&tel_head { ;>:(a,b) :  }', [('a', (0, 0)), ('b', (1, 1))]))
+        self.assertEqual(transform_theory_atom("&true"), ('&tel_head { &(true) :  }', []))
+        self.assertEqual(transform_theory_atom("&false"), ('&tel_head { &(false) :  }', []))
+        self.assertEqual(transform_theory_atom("&final"), ('&tel_head { &(final) :  }', []))
+        self.assertEqual(transform_theory_atom(">>a"), ('&tel_head { >>(a) :  }', [('a', (0, inf))]))
+        self.assertEqual(transform_theory_atom("2+X>a"), ('&tel_head { >(+(2,X),a) :  }', [('a', ('(2+X)', '(2+X)'))]))
 
-        self.assertEqual(formula_to_theory_term(">a"), ">(a)")
-        self.assertEqual(formula_to_theory_term(">:a"), ">:(a)")
-        self.assertEqual(formula_to_theory_term("2>a"), ">(2,a)")
-        self.assertEqual(formula_to_theory_term("(-2)>a"), ">(-(2),a)")
-        self.assertEqual(formula_to_theory_term("-2>a"), ">(-(2),a)")
-        self.assertEqual(formula_to_theory_term("a>?b"), ">?(a,b)")
-        self.assertEqual(formula_to_theory_term("a>*b"), ">*(a,b)")
-        self.assertEqual(formula_to_theory_term("~a"), "~(a)")
-        self.assertEqual(formula_to_theory_term("~ ~a"), "~(~(a))")
-        self.assertEqual(formula_to_theory_term("a & b"), "&(a,b)")
-        self.assertEqual(formula_to_theory_term("a | b"), "|(a,b)")
-        self.assertEqual(formula_to_theory_term("a ;> b"), "&(a,>(b))")
-        self.assertEqual(formula_to_theory_term("a ;>: b"), "&(a,>:(b))")
-        self.assertEqual(formula_to_theory_term("&true"), "&(true)")
-        self.assertEqual(formula_to_theory_term("&false"), "&(false)")
-        self.assertEqual(formula_to_theory_term("&final"), "__final")
-        self.assertEqual(formula_to_theory_term(">>a"), ">*(|(__final,a))")
-
-        self.assertEqual(formula_to_theory_atom(">a"), "&tel(__t) { >(a) :  }")
-        """
+        # TODO: next combine the ranges
 
     def test_interval_set(self):
         self.assertEqual(str(th.IntervalSet([(1,1)])), "{}")
@@ -89,6 +77,7 @@ class TestHead(TestCase):
         self.assertNotIn((1,4), th.IntervalSet([(1,2),(3,4)]))
 
     def test_variables(self):
+        # TODO: might become unnecessary
         self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "[X, Y, Z]")
 
     def test_shift(self):
