@@ -91,8 +91,12 @@ TelConstant = new_variant("TelConstant", ["location", "value"], [], constant_str
 TelComparison = new_variant("TelComparison", ["location", "lhs", "operator", "rhs"], [], "({lhs}{operator}{rhs})")
 TelFormula = new_variant("TelFormula", ["location", "formula"], [], "{formula}")
 
+g_tel_false_atom = "__false"
 g_tel_keywords = ["true", "false", "final"]
 g_tel_shift_variable = "__S"
+
+def time_parameter(loc):
+    return _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
 
 class Interval:
     def __init__(self, left, right):
@@ -340,7 +344,7 @@ class TheoryTermToAtomTransformer(_tf.Transformer):
         name     --  The name of the atom.
         arguments -- The arguments of the atom.
         """
-        ret = _ast.Function(location, name, arguments, False)
+        ret = _ast.Function(location, name, arguments + [time_parameter(location)], False)
         if not positive:
             ret = _ast.UnaryOperation(location, _ast.UnaryOperator.Minus, ret)
         return _ast.SymbolicAtom(ret)
@@ -510,7 +514,7 @@ class TheoryAtomTransformer(_tf.Transformer):
         """
         if len(x.elements) != 1 or x.guard is not None:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        x.term.name = "tel_head"
+        x.term        = _ast.Function(x.term.location, "__tel_head", [time_parameter(x.term.location)], False)
         x.elements[0] = self(x.elements[0])
         return x
 
@@ -588,45 +592,9 @@ def get_variables(x):
     VariablesVisitor(v)(x)
     return [val for _, val in sorted(v.items(), key=lambda x: x[0])]
 
-# {{{1 shift_tel_formula
-
-class ShiftTransformer(_tf.Transformer):
-    def __init__(self, rules, aux):
-        self.__rules = rules
-        self.__aux = aux
-
-    def visit_TelNext(self, x, start):
-        loc = x.location
-
-        sym = lambda v: _ast.Symbol(loc, _clingo.Function(v, []))
-        num = lambda v: _ast.Symbol(loc, _clingo.Number(v))
-        var = lambda v: _ast.Variable(loc, v)
-        com = lambda v: TelComparison(loc, t_lhs, v, start)
-
-        t_lhs = num(1) if x.lhs is None else x.lhs
-        rhs   = self(x.rhs, _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, start, t_lhs))
-        t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, t_lhs, sym(_tf.g_time_parameter_name))
-        t_lhs = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, t_lhs, var(g_tel_shift_variable))
-
-        nxt = TelNext(x.location, term_to_theory_term(t_lhs), x.rhs, x.weak)
-        prv = TelFormula(x.location, _ast.TheoryFunction(x.location, "<", [term_to_theory_term(_ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, t_lhs)), formula_to_theory_term(x.rhs)]))
-        frm = lambda v: TelFormula(x.location, formula_to_theory_term(TelNegation(x.location, TelNegation(x.location, v))))
-
-        cur = TelClause(loc, [rhs, com(_ast.ComparisonOperator.NotEqual)], False)
-        fut = TelClause(loc, [frm(nxt), com(_ast.ComparisonOperator.LessEqual)], False)
-        pst = TelClause(loc, [frm(prv), com(_ast.ComparisonOperator.GreaterEqual)], False)
-        return TelClause(loc, [pst, cur, fut], True)
-
-    def visit_TelUntil(self, x):
-        raise RuntimeError("visit_TelUntil: implement me...")
-
-def shift_tel_formula(x, aux):
-    rules = []
-    x = ShiftTransformer(rules, aux)(x, _ast.Symbol(x.location, _clingo.Number(0)))
-    return x, rules
-
 # {{{1 transform_head
 
+# TODO: Something like this will be needed later at another place...
 def factor_out_tel_formula(x):
     if x.type == "TelClause":
         if x.conjunctive:
@@ -641,67 +609,48 @@ def factor_out_tel_formula(x):
     else:
         return [[x]]
 
-def shift_literal(literal, head, body):
-    """
-    ~ ~ F ->     not &tel { F } # body
-    ~ F   -> not not &tel { F } # body
-    atom  -> atom               # head
-    a > b -> not a > b          # body
-
-    This should be everything!!!
-    """
-    if literal.type == "TelFormula":
-        n = 0
-        formula = literal.formula
-        while formula.type == _ast.ASTType.TheoryFunction and formula.name == "~":
-            formula = formula.arguments[0]
-            n += 1
-        assert(n > 0)
-        sign = _ast.Sign.Negation if n % 2 == 0 else _ast.Sign.DoubleNegation
-        body.append(_ast.Literal(literal.location, sign, theory_term_to_theory_atom(formula)))
-    elif literal.type == "TelAtom":
-        atom = _ast.Function(literal.location, literal.name, literal.arguments + [_ast.Symbol(literal.location, _clingo.Function(_tf.g_time_parameter_name))], False)
-        if not literal.positive:
-            atom = _ast.UnaryOperation(literal.location, _ast.UnaryOperator, atom)
-        head.append(_ast.Literal(literal.location, _ast.Sign.NoSign, _ast.SymbolicAtom(atom)))
-    elif literal.type == "TelComparison":
-        body.append(_ast.Literal(literal.location, _ast.Sign.Negation, _ast.Comparison(literal.operator, literal.lhs, literal.rhs)))
-    else:
-        raise RuntimeError("cannot happen")
-
-# TODO: change completely
-# - introduce an auxiliary external atom per step that never becomes true
-# - extract head atoms
-# - attach time step and change the atom name
 class HeadTransformer:
     def __init__(self):
         self.__num_aux = 0
+        self.__false_external = None
 
     def __aux_atom(self, location, variables, inc=1):
         self.__num_aux += inc
         return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, "__aux_{}".format(self.__num_aux - 1), variables, False)))
 
-    def transform(self, atom):
-        # TODO: reimplement
-        """
-        formula = theory_atom_to_formula(atom)
-        rules = []
-        # TODO: a time parameter has to be attached to the atom
-        variables = get_variables(formula)
-        atom  = self.__aux_atom(atom.location, variables + [_ast.Symbol(atom.location, _clingo.Function(_tf.g_time_parameter_name))])
-        batom = self.__aux_atom(atom.location, variables + [_ast.Variable(atom.location, g_tel_shift_variable)], inc=0)
-        shifted, rules = shift_tel_formula(formula, atom)
-        for clause in factor_out_tel_formula(shifted):
-            #print ([str(lit) for lit in clause])
-            head, body = [], [batom]
-            # TODO: the aux atom has to be added to the body
-            for lit in clause:
-                shift_literal(lit, head, body)
-            if len(head) == 1:
-                head = head[0]
-            else:
-                head = _ast.Disjunction(atom.location, [_ast.ConditionalLiteral(atom.location, x, []) for x in head])
-            rules.append(_ast.Rule(atom.location, head, body))
-        return atom, rules
-        """
+    def __false_atom(self, location):
+        return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, g_tel_false_atom, [], False)))
 
+    def transform(self, atom):
+        loc          = atom.location
+        false        = self.__false_atom(loc)
+        atom, ranges = transform_theory_atom(atom)
+        variables    = get_variables(atom)
+        param        = time_parameter(loc)
+        shift        = _ast.Variable(loc, g_tel_shift_variable)
+        aux          = self.__aux_atom(loc, variables + [param])
+        saux         = self.__aux_atom(loc, variables + [shift], inc=0)
+        rules        = []
+
+        if self.__false_external is None:
+            rules.append(_ast.External(loc, false.atom, []))
+
+        rules.append(_ast.Rule(loc, atom, [saux]))
+
+        if ranges:
+            elems = []
+            for (lhs, rhs), heads in ranges:
+                cond = []
+                diff = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, param, shift)
+
+                if lhs.type != _ast.ASTType.Symbol or lhs.symbol.type != _clingo.SymbolType.Number or lhs.symbol.number > 0:
+                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, lhs, diff)))
+
+                if rhs.type != _ast.ASTType.Symbol or rhs.symbol.type != _clingo.SymbolType.Supremum:
+                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, diff, rhs)))
+
+                elems.extend([_ast.ConditionalLiteral(loc, _ast.Literal(loc, _ast.Sign.NoSign, head), cond) for head in heads])
+
+            rules.append(_ast.Rule(loc, _ast.Disjunction(loc, elems), [saux, false]))
+
+        return aux, rules

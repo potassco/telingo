@@ -157,7 +157,7 @@ def transform(inputs, callback):
 
     _clingo.parse_program(_dedent('''\
         #theory tel {
-            formula  {
+            formula_body  {
                 &   : 7, unary;         % prefix for keywords
                 -   : 7, unary;         % classical negation
                 +   : 6, binary, left;  % arithmetic +
@@ -191,7 +191,28 @@ def transform(inputs, callback):
                 <;  : 0, binary, left;  % sequence previous
                 <:; : 0, binary, left   % sequence weak previous
             };
-            &tel/1 : formula, body
+            formula_head  {
+                &   : 7, unary;         % prefix for keywords
+                -   : 7, unary;         % classical negation
+                +   : 6, binary, left;  % arithmetic +
+                -   : 6, binary, left;  % arithmetic -
+                ~   : 5, unary;         % negation
+                >   : 5, unary;         % next
+                >   : 5, binary, right; % n x next
+                >:  : 5, unary;         % weak next
+                >:  : 5, binary, right; % n x weak next
+                >?  : 5, unary;         % eventually+
+                >*  : 5, unary;         % always+
+                >>  : 5, unary;         % finally
+                >*  : 4, binary, left;  % release
+                >?  : 4, binary, left;  % until
+                &   : 3, binary, left;  % and
+                |   : 2, binary, left;  % or
+                ;>  : 0, binary, right; % sequence next
+                ;>: : 0, binary, right  % sequence weak next
+            };
+            &tel/1 : formula_body, body;
+            &__tel_head/1 : formula_body, head
         }.
         '''), no_program)
     return future_sigs, reground_parts
