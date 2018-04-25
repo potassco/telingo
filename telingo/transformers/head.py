@@ -7,6 +7,7 @@ from . import transformer as _tf
 import clingo as _clingo
 from clingo import ast as _ast
 from numbers import Number as _Number
+from operator import itemgetter as _itemgetter
 
 # {{{ data structures
 
@@ -142,7 +143,7 @@ class IntervalSet:
 
     def __iter__(self):
         for x in self.__elements:
-            yield x
+            yield x.left, x.right
 
     def __contains__(self, x):
         y = Interval(x[0], x[1])
@@ -519,13 +520,42 @@ def transform_theory_atom(x):
     """
     atoms = []
     atom = TheoryAtomTransformer(atoms)(x)
-    # TODO: the atom should be grouped by ranges here
-    # separate numeric from non-numeric ranges
-    # group by atom and join numeric ranges using the interval set
-    # convert numbers to symbols
-    # finall group by ranges
 
-    return atom, atoms
+    # maps atoms to a set of numeric ranges
+    numeric = {}
+    # maps ranges to a set of symbolic ranges
+    other = {}
+
+    # add to symbolic ranges converting numeric ranges
+    def add(atm, lhs, rhs):
+        if isinstance(lhs, _Number):
+            lhs = _ast.Symbol(atom.location, _clingo.Number(lhs))
+        if rhs == float("inf"):
+            rhs = _ast.Symbol(atom.location, _clingo.Supremum)
+        elif isinstance(rhs, _Number):
+            rhs = _ast.Symbol(atom.location, _clingo.Number(rhs))
+
+        rng = (lhs, rhs)
+        other.setdefault(str(rng), (rng, {}))[1].setdefault(str(atm), atm)
+
+    # split into numeric and symbolic ranges
+    for atm, (lhs, rhs) in atoms:
+        if isinstance(lhs, _Number) and isinstance(rhs, _Number):
+            numeric.setdefault(str(atm), (atm, IntervalSet()))[1].add((lhs, rhs+1))
+        else:
+            add(atm, lhs, rhs)
+
+    # add combined numeric ranges as symbolic ranges
+    for atm, rngs in numeric.values():
+        for lhs, rhs in rngs:
+            add(atm, lhs, rhs-1)
+
+    # flatten symbolic ranges into a list
+    ranges = []
+    for _, (rng, atoms) in sorted(other.items(), key=_itemgetter(0)):
+        ranges.append((rng, [atm for _, atm in sorted(atoms.items(), key=_itemgetter(0))]))
+
+    return atom, ranges
 
 # {{{1 get_variables
 

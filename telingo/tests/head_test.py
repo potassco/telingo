@@ -24,9 +24,9 @@ def theory_term_to_atom(s, positive=True):
     return str(th.theory_term_to_atom(parse_atom(s), positive))
 
 def transform_theory_atom(s):
-    atom, atoms = th.transform_theory_atom(parse_formula(s))
-    tostr = lambda x: x if isinstance(x, Number) else str(x)
-    return (str(atom), [(str(a), (tostr(l), tostr(r))) for a, (l, r) in atoms])
+    atom, ranges = th.transform_theory_atom(parse_formula(s))
+    tostr = lambda x: x.symbol.number if x.type == clingo.ast.ASTType.Symbol and x.symbol.type == clingo.SymbolType.Number else str(x)
+    return (str(atom), [((tostr(l), tostr(r)), [str(a) for a in atms]) for (l, r), atms in ranges])
 
 class TestHead(TestCase):
     def test_atom(self):
@@ -43,25 +43,26 @@ class TestHead(TestCase):
 
     def test_formula(self):
         inf = float("inf")
-        self.assertEqual(transform_theory_atom(">a"), ('&tel_head { >(a) :  }', [('a', (1, 1))]))
-        self.assertEqual(transform_theory_atom(">:a"), ('&tel_head { >:(a) :  }', [('a', (1, 1))]))
-        self.assertEqual(transform_theory_atom("2>a"), ('&tel_head { >(2,a) :  }', [('a', (2, 2))]))
-        self.assertEqual(transform_theory_atom("(-2)>a"), ('&tel_head { >((- 2),a) :  }', [('a', (-2, -2))]))
-        self.assertEqual(transform_theory_atom("a>?b"), ('&tel_head { >?(a,b) :  }', [('a', (0, inf)), ('b', (0, inf))]))
-        self.assertEqual(transform_theory_atom("> (a >? > b)"), ('&tel_head { >((a >? > b)) :  }', [('a', (1, inf)), ('b', (2, inf))]))
+        self.assertEqual(transform_theory_atom(">a"), ('&tel_head { >(a) :  }', [((1, 1), ['a'])]))
+        self.assertEqual(transform_theory_atom(">:a"), ('&tel_head { >:(a) :  }', [((1, 1), ['a'])]))
+        self.assertEqual(transform_theory_atom("2>a"), ('&tel_head { >(2,a) :  }', [((2, 2), ['a'])]))
+        self.assertEqual(transform_theory_atom("(-2)>a"), ('&tel_head { >((- 2),a) :  }', [((-2, -2), ['a'])]))
+        self.assertEqual(transform_theory_atom("a>?b"), ('&tel_head { >?(a,b) :  }', [((0, '#sup'), ['a', 'b'])]))
+        self.assertEqual(transform_theory_atom("> (a >? > b)"), ('&tel_head { >((a >? > b)) :  }', [((1, '#sup'), ['a']), ((2, '#sup'), ['b'])]))
         self.assertEqual(transform_theory_atom("~a"), ('&tel_head { ~(a) :  }', []))
         self.assertEqual(transform_theory_atom("~ ~a"), ('&tel_head { ~(~(a)) :  }', []))
-        self.assertEqual(transform_theory_atom("a & b"), ('&tel_head { &(a,b) :  }', [('a', (0, 0)), ('b', (0, 0))]))
-        self.assertEqual(transform_theory_atom("a | b"), ('&tel_head { |(a,b) :  }', [('a', (0, 0)), ('b', (0, 0))]))
-        self.assertEqual(transform_theory_atom("a ;> b"), ('&tel_head { ;>(a,b) :  }', [('a', (0, 0)), ('b', (1, 1))]))
-        self.assertEqual(transform_theory_atom("a ;>: b"), ('&tel_head { ;>:(a,b) :  }', [('a', (0, 0)), ('b', (1, 1))]))
+        self.assertEqual(transform_theory_atom("a & b"), ('&tel_head { &(a,b) :  }', [((0, 0), ['a', 'b'])]))
+        self.assertEqual(transform_theory_atom("a | b"), ('&tel_head { |(a,b) :  }', [((0, 0), ['a', 'b'])]))
+        self.assertEqual(transform_theory_atom("a ;> b"), ('&tel_head { ;>(a,b) :  }', [((0, 0), ['a']), ((1, 1), ['b'])]))
+        self.assertEqual(transform_theory_atom("a ;>: b"), ('&tel_head { ;>:(a,b) :  }', [((0, 0), ['a']), ((1, 1), ['b'])]))
         self.assertEqual(transform_theory_atom("&true"), ('&tel_head { &(true) :  }', []))
         self.assertEqual(transform_theory_atom("&false"), ('&tel_head { &(false) :  }', []))
         self.assertEqual(transform_theory_atom("&final"), ('&tel_head { &(final) :  }', []))
-        self.assertEqual(transform_theory_atom(">>a"), ('&tel_head { >>(a) :  }', [('a', (0, inf))]))
-        self.assertEqual(transform_theory_atom("2+X>a"), ('&tel_head { >(+(2,X),a) :  }', [('a', ('(2+X)', '(2+X)'))]))
+        self.assertEqual(transform_theory_atom(">>a"), ('&tel_head { >>(a) :  }', [((0, '#sup'), ['a'])]))
+        self.assertEqual(transform_theory_atom("2+X>a"), ('&tel_head { >(+(2,X),a) :  }', [(('(2+X)', '(2+X)'), ['a'])]))
 
-        # TODO: next combine the ranges
+        self.assertEqual(transform_theory_atom(">a | > > a"), ('&tel_head { |(>(a),>(>(a))) :  }', [((1, 2), ['a'])]))
+        self.assertEqual(transform_theory_atom(">a | >* a"), ('&tel_head { |(>(a),>*(a)) :  }', [((0, '#sup'), ['a'])]))
 
     def test_interval_set(self):
         self.assertEqual(str(th.IntervalSet([(1,1)])), "{}")
