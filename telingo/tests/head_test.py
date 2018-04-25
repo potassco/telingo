@@ -28,6 +28,10 @@ def transform_theory_atom(s):
     tostr = lambda x: x.symbol.number if x.type == clingo.ast.ASTType.Symbol and x.symbol.type == clingo.SymbolType.Number else str(x)
     return (str(atom), [((tostr(l), tostr(r)), [str(a) for a in atms]) for (l, r), atms in ranges])
 
+def transform(s):
+    atom, rules = th.HeadTransformer().transform(parse_formula(s))
+    return (str(atom), [str(rule) for rule in rules])
+
 class TestHead(TestCase):
     def test_atom(self):
         self.assertEqual(theory_term_to_atom("a(1+2)"), "a(3,__t)")
@@ -79,10 +83,17 @@ class TestHead(TestCase):
     def test_variables(self):
         self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "[X, Y, Z]")
 
-    def test_shift(self):
-        """
-        self.assertEqual(shift_formula("a"), ("a", []))
-        l = '((1-__t)+__S)'
-        m = '+(-(1,__t),__S)'
-        self.assertEqual(shift_formula(">a"), ('((~(~(<(-({m}),a)))|({l}>=0))&(a|({l}!=0))&(~(~(>({m},a)))|({l}<=0)))'.format(l=l, m=m), []))
-        """
+    def test_transform(self):
+        self.assertEqual(transform("a"), ('__aux_0(__t)',
+            [ '#external __false(__t).'
+            , '&__tel_head(__t) { a :  } :- __aux_0(__t).'
+            , 'a(__t) : (__t-__S)<=0 :- __aux_0(__S); __false(__t).'
+            ]))
+        self.assertEqual(transform("> a | > > > b"), ('__aux_0(__t)',
+            [ '#external __false(__t).'
+            , '&__tel_head(__t) { |(>(a),>(>(>(b)))) :  } :- __aux_0(__t).'
+            , 'a(__t) : 1<=(__t-__S), (__t-__S)<=1; b(__t) : 3<=(__t-__S), (__t-__S)<=3 :- __aux_0(__S); __false(__t).']))
+        self.assertEqual(transform("> >? a"), ('__aux_0(__t)',
+            [ '#external __false(__t).'
+            , '&__tel_head(__t) { >(>?(a)) :  } :- __aux_0(__t).'
+            , 'a(__t) : 1<=(__t-__S) :- __aux_0(__S); __false(__t).']))

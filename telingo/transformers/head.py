@@ -619,7 +619,7 @@ class HeadTransformer:
         return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, "__aux_{}".format(self.__num_aux - 1), variables, False)))
 
     def __false_atom(self, location):
-        return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, g_tel_false_atom, [], False)))
+        return _ast.Literal(location, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(location, g_tel_false_atom, [time_parameter(location)], False)))
 
     def transform(self, atom):
         loc          = atom.location
@@ -635,7 +635,7 @@ class HeadTransformer:
         if self.__false_external is None:
             rules.append(_ast.External(loc, false.atom, []))
 
-        rules.append(_ast.Rule(loc, atom, [saux]))
+        rules.append(_ast.Rule(loc, atom, [aux]))
 
         if ranges:
             elems = []
