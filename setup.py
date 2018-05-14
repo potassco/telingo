@@ -8,7 +8,7 @@ setup(
     description = 'System to solve temporal logic programs.',
     author = 'Roland Kaminski',
     license = 'MIT',
-    packages = ['telingo', 'telingo.transformers'],
+    packages = ['telingo', 'telingo.theory', 'telingo.transformers'],
     test_suite = 'telingo.tests',
     zip_safe = False,
     entry_points = {
