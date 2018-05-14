@@ -5,33 +5,9 @@ rule bodies to rules via clingo's backend.
 
 import clingo as _clingo
 
-# Base for Formulas {{{1
+from . import formula as _frm
 
-def make_equal(backend, a, b):
-    """
-    Generates clauses for a <-> b.
-
-    Arguments:
-    backend -- Backend to add clauses to.
-    a       -- first literal
-    b       -- second literal
-    """
-    backend.add_rule([], [ a, -b])
-    backend.add_rule([], [-a,  b])
-
-def make_disjunction(backend, e, a, b):
-    """
-    Generates clauses for e <-> a | b.
-
-    Arguments:
-    backend -- Backend to add clauses to.
-    e       -- equivalent literal
-    a       -- first literal of disjunction
-    b       -- second literal of disjunction
-    """
-    backend.add_rule([], [ e, -a, -b])
-    backend.add_rule([], [-e, a])
-    backend.add_rule([], [-e, b])
+# Base for Body Formulas {{{1
 
 class StepData:
     """
@@ -74,44 +50,10 @@ class StepData:
             backend.add_rule([self.literal], [], True)
         return self.literal
 
-class Context:
+
+class BodyFormula(_frm.Formula):
     """
-    Class gathering arguments used throughout functions in this module.
-
-    Members:
-    add_todo        -- Function to add theory atoms that have to be translated
-                       later.
-    backend         -- Clingo Backend object.
-    symbols         -- Clingo SymbolicAtoms object.
-    horizon         -- Current search horizon.
-    __false_literal -- Function to obtain a false literal.
-    """
-    def __init__(self, backend, symbols, add_todo, false_literal, horizon):
-        """
-        Initializes the context.
-
-        Arguments:
-        backend       -- Backend object.
-        symbols       -- SymbolicAtoms object.
-        add_todo      -- Function to add theory atoms to the todo list.
-        false_literal -- Function to obtain a false literal.
-        """
-        self.add_todo        = add_todo
-        self.backend         = backend
-        self.symbols         = symbols
-        self.horizon         = horizon
-        self.__false_literal = false_literal
-
-    @property
-    def false_literal(self):
-        """
-        Returns a literal that is always false.
-        """
-        return self.__false_literal(self.backend)
-
-class Formula:
-    """
-    Base class of all temporal and Boolean formulas.
+    Base class of all temporal and Boolean formulas occurring in rule bodies.
 
     Members:
     __rep  -- unique string representation of the formula
@@ -149,7 +91,7 @@ class Formula:
         self.do_translate(ctx, step, data)
         if len(data.todo) > 0:
             for atom in data.todo:
-                make_equal(ctx.backend, atom, data.literal)
+                _frm.make_equal(ctx.backend, atom, data.literal)
             del data.todo[:]
         return data.literal
 
@@ -169,7 +111,7 @@ class Formula:
 
 # Boolean Formulas {{{1
 
-class Atom(Formula):
+class Atom(BodyFormula):
     """
     An atomic formula.
 
@@ -192,7 +134,7 @@ class Atom(Formula):
             raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
         if name.endswith("'"):
             raise RuntimeError("temporal formulas use > instead of trailing primes: ".format(rep))
-        Formula.__init__(self, rep)
+        BodyFormula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
         self.__positive  = positive
@@ -218,7 +160,7 @@ class Atom(Formula):
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 
-class NumericLiteral(Formula):
+class NumericLiteral(BodyFormula):
     """
     An formula over a numeric literal.
 
@@ -232,7 +174,7 @@ class NumericLiteral(Formula):
         Arguments:
         literal -- The numeric literal.
         """
-        Formula.__init__(self, literal)
+        BodyFormula.__init__(self, literal)
         self.__literal = literal
 
     def do_translate(self, ctx, step, data):
@@ -252,7 +194,7 @@ class NumericLiteral(Formula):
             data.literal = self.__literal
 
 
-class BooleanConstant(Formula):
+class BooleanConstant(BodyFormula):
     """
     Formula capturing a Boolean constant.
 
@@ -266,7 +208,7 @@ class BooleanConstant(Formula):
         Members:
         __value -- Boolean value of the formula.
         """
-        Formula.__init__(self, "(&true)" if value else "(&false)")
+        BodyFormula.__init__(self, "(&true)" if value else "(&false)")
         self.__value = value
 
     def do_translate(self, ctx, step, data):
@@ -287,7 +229,7 @@ class BooleanConstant(Formula):
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -ctx.false_literal if self.__value else ctx.false_literal
 
-class Negation(Formula):
+class Negation(BodyFormula):
     """
     Formula capturing (classical) negation.
 
@@ -298,7 +240,7 @@ class Negation(Formula):
         """
         Initializes the formula with the formula to negate.
         """
-        Formula.__init__(self, "(~{})".format(arg._rep))
+        BodyFormula.__init__(self, "(~{})".format(arg._rep))
         self.__arg = arg
 
     def do_translate(self, ctx, step, data):
@@ -318,7 +260,7 @@ class Negation(Formula):
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
 
-class BooleanFormula(Formula):
+class BooleanFormula(BodyFormula):
     """
     Formula capturing binary Boolean formulas.
 
@@ -357,7 +299,7 @@ class BooleanFormula(Formula):
         rhs      -- Formula on the right-hand-side.
         """
         rep = "({}{}{})".format(lhs._rep, BooleanFormula.Ops[operator], rhs._rep)
-        Formula.__init__(self, rep)
+        BodyFormula.__init__(self, rep)
         self.__operator = operator
         self.__lhs      = lhs
         self.__rhs      = rhs
@@ -389,7 +331,7 @@ class BooleanFormula(Formula):
                     rhs = -rhs
                 elif self.__operator == BooleanFormula.Ri:
                     lhs = -lhs
-                make_disjunction(ctx.backend, lit, lhs, rhs)
+                _frm.make_disjunction(ctx.backend, lit, lhs, rhs)
             elif self.__operator == BooleanFormula.Eq:
                 ctx.backend.add_rule([], [ lit,  rhs,  lhs])
                 ctx.backend.add_rule([], [ lit, -rhs, -lhs])
@@ -418,7 +360,7 @@ _arithmetic_operators = {"+", "-"}
 
 # Temporal Formulas {{{1
 
-class Previous(Formula):
+class Previous(BodyFormula):
     """
     Captures a formula referring to the previous state.
 
@@ -437,7 +379,7 @@ class Previous(Formula):
         n    -- How many steps to look back.
         """
         assert(n > 0)
-        Formula.__init__(self, "({}{}{})".format(n, "<:" if weak else "<", arg._rep))
+        BodyFormula.__init__(self, "({}{}{})".format(n, "<:" if weak else "<", arg._rep))
         self.__arg  = arg
         self.__weak = weak
         self.__n = n
@@ -468,7 +410,7 @@ class Previous(Formula):
                 if self.__weak and step < self.__n:
                     data.literal = -data.literal
 
-class Initially(Formula):
+class Initially(BodyFormula):
     """
     Captures a formula referring to the initial situation.
 
@@ -482,7 +424,7 @@ class Initially(Formula):
         Arguments:
         arg  -- The argument of the initial operator.
         """
-        Formula.__init__(self, "(<<{})".format(arg._rep))
+        BodyFormula.__init__(self, "(<<{})".format(arg._rep))
         self.__arg  = arg
 
     def do_translate(self, ctx, step, data):
@@ -502,7 +444,7 @@ class Initially(Formula):
         if data.literal is None:
             data.literal = self.__arg.translate(ctx, 0)
 
-class Next(Formula):
+class Next(BodyFormula):
     """
     Captures a formula referring to the next state.
 
@@ -520,7 +462,7 @@ class Next(Formula):
         weak -- Whether this is a weak next operator.
         n    -- How many steps to look ahead.
         """
-        Formula.__init__(self, "({}{}{})".format(n, ">:" if weak else ">", arg._rep))
+        BodyFormula.__init__(self, "({}{}{})".format(n, ">:" if weak else ">", arg._rep))
         assert(n > 0)
         self.__arg  = arg
         self.__weak = weak
@@ -560,13 +502,13 @@ class Next(Formula):
             assert(step in range(0, ctx.horizon + 1))
             if step + self.__n <= ctx.horizon:
                 arg = self.__arg.translate(ctx, step + self.__n)
-                make_equal(ctx.backend, data.literal, arg)
+                _frm.make_equal(ctx.backend, data.literal, arg)
                 ctx.backend.add_external(data.literal, _clingo.TruthValue.Free)
                 data.done = True
             else:
                 ctx.add_todo(self, step)
 
-class TelFormula(Formula):
+class TelFormula(BodyFormula):
     """
     Captures a since, trigger, release, or until formula.
 
@@ -599,7 +541,7 @@ class TelFormula(Formula):
         lhs -- The left-hand-side of the operator.
         rhs -- The right-hand-side of the operator.
         """
-        Formula.__init__(self, rep)
+        BodyFormula.__init__(self, rep)
         self._op  = op
         self._lhs = lhs
         self._rhs = rhs

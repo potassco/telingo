@@ -4,6 +4,7 @@ clingo's backend.
 """
 
 import clingo as _clingo
+from . import formula as _frm
 from . import body as _bd
 from . import head as _hd
 
@@ -80,10 +81,15 @@ class Theory:
                 formula = _bd.translate_elements(atom.elements, self.add_formula)
                 formula.add_atom(atom.literal, step)
                 self.add_todo(formula, step)
+            elif atom.term.name == "__tel_head" and len(atom.term.arguments) == 1:
+                step    = atom.term.arguments[0].number
+                formula = _hd.translate_formula(atom.literal, atom.elements, self.add_formula)
+
+                raise RuntimeError("implement me: translate head atoms")
 
         if len(self.__todo) > 0:
             todo, self.__todo, self.__todo_keys = self.__todo, [], set()
             with prg.backend() as b:
-                ctx = _bd.Context(b, prg.symbolic_atoms, self.add_todo, self.false_literal, horizon)
+                ctx = _frm.Context(b, prg.symbolic_atoms, self.add_todo, self.false_literal, horizon)
                 for step, formula in todo:
                     formula.translate(ctx, step)
