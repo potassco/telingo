@@ -83,9 +83,8 @@ class Theory:
                 self.add_todo(formula, step)
             elif atom.term.name == "__tel_head" and len(atom.term.arguments) == 1:
                 step    = atom.term.arguments[0].number
-                formula = _hd.translate_formula(atom.literal, atom.elements, self.add_formula)
-
-                raise RuntimeError("implement me: translate head atoms")
+                formula = _hd.translate_formula(atom, self.add_formula)
+                self.add_todo(formula, step)
 
         if len(self.__todo) > 0:
             todo, self.__todo, self.__todo_keys = self.__todo, [], set()

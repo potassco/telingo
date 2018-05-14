@@ -5,7 +5,7 @@ rule bodies to rules via clingo's backend.
 
 import clingo as _clingo
 
-from . import formula as _frm
+from .formula import *
 
 # Base for Body Formulas {{{1
 
@@ -51,7 +51,7 @@ class StepData:
         return self.literal
 
 
-class BodyFormula(_frm.Formula):
+class BodyFormula(Formula):
     """
     Base class of all temporal and Boolean formulas occurring in rule bodies.
 
@@ -91,7 +91,7 @@ class BodyFormula(_frm.Formula):
         self.do_translate(ctx, step, data)
         if len(data.todo) > 0:
             for atom in data.todo:
-                _frm.make_equal(ctx.backend, atom, data.literal)
+                make_equal(ctx.backend, atom, data.literal)
             del data.todo[:]
         return data.literal
 
@@ -268,26 +268,7 @@ class BooleanFormula(BodyFormula):
     __operator -- The Boolean connective.
     __lhs      -- The formula on the left-hand-side.
     __rhs      -- The formula on the left-hand-side.
-
-    Class Constants:
-    And -- Id of & connective.
-    Or  -- Id of | connective.
-    Eq  -- Id of <> connective.
-    Li  -- Id of <- connective.
-    Ri  -- Id of -> connective.
-    Ops -- Map from connective id to its string representation.
     """
-    And = 0
-    Or  = 1
-    Eq  = 2
-    Li  = 3
-    Ri  = 4
-    Ops = {
-        And: "&",
-        Or: "|",
-        Eq: "<>",
-        Li: "<-",
-        Ri: "->"}
 
     def __init__(self, operator, lhs, rhs):
         """
@@ -298,7 +279,7 @@ class BooleanFormula(BodyFormula):
         lhs      -- Formula on the left-hand-side.
         rhs      -- Formula on the right-hand-side.
         """
-        rep = "({}{}{})".format(lhs._rep, BooleanFormula.Ops[operator], rhs._rep)
+        rep = "({}{}{})".format(lhs._rep, operator, rhs._rep)
         BodyFormula.__init__(self, rep)
         self.__operator = operator
         self.__lhs      = lhs
@@ -324,39 +305,19 @@ class BooleanFormula(BodyFormula):
             lhs = self.__lhs.translate(ctx, step)
             rhs = self.__rhs.translate(ctx, step)
             lit = data.add_literal(ctx.backend)
-            if self.__operator != BooleanFormula.Eq:
-                if self.__operator == BooleanFormula.And:
+            if self.__operator != "<>":
+                if self.__operator == "&":
                     lit, lhs, rhs = -lit, -lhs, -rhs
-                elif self.__operator == BooleanFormula.Li:
+                elif self.__operator == "<-":
                     rhs = -rhs
-                elif self.__operator == BooleanFormula.Ri:
+                elif self.__operator == "->":
                     lhs = -lhs
-                _frm.make_disjunction(ctx.backend, lit, lhs, rhs)
-            elif self.__operator == BooleanFormula.Eq:
+                make_disjunction(ctx.backend, lit, lhs, rhs)
+            elif self.__operator == "<>":
                 ctx.backend.add_rule([], [ lit,  rhs,  lhs])
                 ctx.backend.add_rule([], [ lit, -rhs, -lhs])
                 ctx.backend.add_rule([], [-lit,  rhs, -lhs])
                 ctx.backend.add_rule([], [-lit, -rhs,  lhs])
-
-"""
-Map from binary Boolean connective strings to their ids.
-"""
-_binary_operators = {
-    "&": BooleanFormula.And,
-    "|": BooleanFormula.Or,
-    "<>": BooleanFormula.Eq,
-    "<-": BooleanFormula.Li,
-    "->": BooleanFormula.Ri}
-
-"""
-Set of unary Boolean operators.
-"""
-_unary_operators = {"~"}
-
-"""
-Set of binary arithmetic operators.
-"""
-_arithmetic_operators = {"+", "-"}
 
 # Temporal Formulas {{{1
 
@@ -502,7 +463,7 @@ class Next(BodyFormula):
             assert(step in range(0, ctx.horizon + 1))
             if step + self.__n <= ctx.horizon:
                 arg = self.__arg.translate(ctx, step + self.__n)
-                _frm.make_equal(ctx.backend, data.literal, arg)
+                make_equal(ctx.backend, data.literal, arg)
                 ctx.backend.add_external(data.literal, _clingo.TruthValue.Free)
                 data.done = True
             else:
@@ -523,13 +484,7 @@ class TelFormula(BodyFormula):
     _op  -- The id of the operator.
     _lhs -- The left-hand-side of the temporal operator.
     _rhs -- The right-hand-side of the temporal operator.
-
-    Class Constants:
-    Since   -- Id of the since or release operator.
-    Trigger -- Id of the trigger or until operator.
     """
-    Since   = 0
-    Trigger = 1
 
     def __init__(self, rep, op, lhs, rhs):
         """
@@ -565,7 +520,7 @@ class TelFormula(BodyFormula):
         lhs = None if self._lhs is None else self._lhs.translate(ctx, step)
         rhs = self._rhs.translate(ctx, step)
         lit = data.add_literal(ctx.backend)
-        if self._op == TelFormulaP.Trigger:
+        if self._op == "<*" or self._op == ">*":
             lit, rhs, pre = -lit, -rhs, -pre
             if lhs is not None:
                 lhs = -lhs
@@ -594,7 +549,7 @@ class TelFormulaP(TelFormula):
         lhs -- The left-hand-side of the operator.
         rhs -- The right-hand-side of the operator.
         """
-        rep = "({}{}{})".format("" if lhs is None else lhs._rep, "<?" if op == TelFormula.Since else "<*", rhs._rep)
+        rep = "({}{}{})".format("" if lhs is None else lhs._rep, op, rhs._rep)
         TelFormula.__init__(self, rep, op, lhs, rhs)
 
     def do_translate(self, ctx, step, data):
@@ -637,7 +592,7 @@ class TelFormulaN(TelFormula):
         lhs -- The left-hand-side of the operator.
         rhs -- The right-hand-side of the operator.
         """
-        rep = "({}{}{})".format("" if lhs is None else lhs._rep, ">?" if op == TelFormula.Since else ">*", rhs._rep)
+        rep = "({}{}{})".format("" if lhs is None else lhs._rep, op, rhs._rep)
         TelFormula.__init__(self, rep, op, lhs, rhs)
         self.__future = None
 
@@ -670,48 +625,7 @@ class TelFormulaN(TelFormula):
             fut = self.__future.translate(ctx, step)
             self._translate(ctx, step, data, fut)
 
-_tel_operators = {"<", ">", "<:", ">:", "<*", ">*", ">?", "<?", ">>", "<<", "<;", "<:;", ";>", ";>:"}
-
 # Theory of Formulas {{{1
-
-def create_symbol(rep):
-    """
-    Returns the symbolic representation of the given theory term.
-
-    Throws an error if rep it is not a valid symbol.
-
-    Arguments:
-    rep -- Theory term to translate.
-    """
-    if rep.type == _clingo.TheoryTermType.Number:
-        return _clingo.Number(rep.number)
-    elif rep.type in [_clingo.TheoryTermType.List, _clingo.TheoryTermType.Set]:
-        raise RuntimeError("invalid symbol: {}".format(rep))
-    elif rep.type == _clingo.TheoryTermType.Function and rep.name in _arithmetic_operators:
-        if len(rep.arguments) == 1:
-            rhs = create_symbol(rep.arguments[0])
-            if rep.name == "-":
-                if rhs.type == _clingo.SymbolType.Number:
-                    return _clingo.Number(-rhs.number)
-                elif rhs.type == _clingo.SymbolType.Function and len(rep.name) > 0:
-                    return _clingo.Function(rhs.name, rhs.arguments, not rhs.positive)
-        elif len(rep.arguments) == 2:
-            return _clingo.Number(create_number(rep))
-
-        raise RuntimeError("invalid symbol: {}".format(rep))
-    else:
-        name = "" if rep.type == _clingo.TheoryTermType.Tuple else rep.name
-        if name in _binary_operators or name in _unary_operators or name in _tel_operators:
-            raise RuntimeError("invalid symbol: {}".format(rep))
-        args = [] if rep.type == _clingo.TheoryTermType.Symbol else rep.arguments
-        if len(args) == 0:
-            if name == "#inf":
-                return _clingo.Infimum
-            elif name == "#sup":
-                return _clingo.Supremum
-            elif len(name) > 1 and name.startswith('"') and name.endswith('"'):
-                return _clingo.String(name[1:-1])
-        return _clingo.Function(name, [create_symbol(arg) for arg in args])
 
 def create_atom(rep, add_formula, positive):
     """
@@ -729,27 +643,9 @@ def create_atom(rep, add_formula, positive):
     elif rep.type == _clingo.TheoryTermType.Function:
         if rep.name == "-" and len(rep.arguments) == 1:
             return create_atom(rep.arguments[0], add_formula, not positive)
-        elif rep.name not in _binary_operators and rep.name not in _unary_operators and rep.name not in _tel_operators and rep.name not in _arithmetic_operators:
+        elif rep.name not in g_binary_operators and rep.name not in g_unary_operators and rep.name not in g_tel_operators and rep.name not in g_arithmetic_operators:
             return add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
     raise RuntimeError("invalid atom: ".format(rep))
-
-def create_number(rep):
-    if rep.type == _clingo.TheoryTermType.Function:
-        args = rep.arguments
-        if rep.name == "-" and len(args) == 1:
-            return -create_number(rep.arguments[0])
-        if rep.name in _arithmetic_operators and len(args) == 2:
-            lhs = create_number(rep.arguments[0])
-            rhs = create_number(rep.arguments[1])
-            if rep.name == "+":
-                return lhs + rhs
-            elif rep.name == "-":
-                return lhs - rhs
-    elif rep.type == _clingo.TheoryTermType.Number and rep.number >= 0:
-        return rep.number
-    # TODO: this case should be handled as in AG
-    #       the corresponding formula should evaluate to false
-    raise RuntimeError("number expected: ".format(rep))
 
 def create_formula(rep, add_formula):
     """
@@ -765,14 +661,14 @@ def create_formula(rep, add_formula):
         return create_atom(rep, add_formula, True)
     elif rep.type == _clingo.TheoryTermType.Function:
         args = rep.arguments
-        if rep.name in _binary_operators and len(args) == 2:
+        if rep.name in g_binary_operators and len(args) == 2:
             lhs = create_formula(args[0], add_formula)
             rhs = create_formula(args[1], add_formula)
-            return add_formula(BooleanFormula(_binary_operators[rep.name], lhs, rhs))
-        elif rep.name in _unary_operators and len(args) == 1:
+            return add_formula(BooleanFormula(rep.name, lhs, rhs))
+        elif rep.name in g_unary_operators and len(args) == 1:
             arg = create_formula(args[0], add_formula)
             return add_formula(Negation(arg))
-        elif rep.name in _tel_operators:
+        elif rep.name in g_tel_operators:
             rhs = create_formula(args[-1], add_formula)
             if rep.name == "<" or rep.name == "<:":
                 lhs = 1 if len(args) == 1 else create_number(args[0])
@@ -782,27 +678,27 @@ def create_formula(rep, add_formula):
                 return rhs if lhs == 0 else add_formula(Next(rhs, lhs, rep.name == ">:"))
             lhs = None if len(args) == 1 else create_formula(args[0], add_formula)
             if rep.name == "<;" or rep.name == "<:;":
-                return add_formula(BooleanFormula(BooleanFormula.And, Previous(lhs, 1, rep.name == "<:;"), rhs))
+                return add_formula(BooleanFormula("&", Previous(lhs, 1, rep.name == "<:;"), rhs))
             elif rep.name == "<*":
-                return add_formula(TelFormulaP(TelFormula.Trigger, lhs, rhs))
+                return add_formula(TelFormulaP("<*", lhs, rhs))
             elif rep.name == "<?":
-                return add_formula(TelFormulaP(TelFormula.Since, lhs, rhs))
+                return add_formula(TelFormulaP("<?", lhs, rhs))
             elif rep.name == "<<":
                 return add_formula(Initially(rhs))
             elif rep.name == ";>" or rep.name == ";>:":
-                return add_formula(BooleanFormula(BooleanFormula.And, lhs, Next(rhs, 1, rep.name == ";>:")))
+                return add_formula(BooleanFormula("&", lhs, Next(rhs, 1, rep.name == ";>:")))
             elif rep.name == ">*":
-                formula = add_formula(TelFormulaN(TelFormula.Trigger, lhs, rhs))
+                formula = add_formula(TelFormulaN(">*", lhs, rhs))
                 formula.set_future(add_formula(Next(formula, 1, True)))
                 return formula
             elif rep.name == ">?":
-                formula = add_formula(TelFormulaN(TelFormula.Since, lhs, rhs))
+                formula = add_formula(TelFormulaN(">?", lhs, rhs))
                 formula.set_future(add_formula(Next(formula, 1, False)))
                 return formula
             else:
                 assert(rep.name == ">>")
-                rhs = add_formula(BooleanFormula(BooleanFormula.Or, add_formula(Negation(add_formula(Atom("__final", [], True)))), rhs))
-                formula = add_formula(TelFormulaN(TelFormula.Trigger, None, rhs))
+                rhs = add_formula(BooleanFormula("|", add_formula(Negation(add_formula(Atom("__final", [], True)))), rhs))
+                formula = add_formula(TelFormulaN(">*", None, rhs))
                 formula.set_future(add_formula(Next(formula, 1, True)))
                 return formula
         elif rep.name == "&":
@@ -837,7 +733,7 @@ def translate_conjunction(formulas, add_formula):
     formulas.sort(key=lambda x: x._rep)
     formula = formulas[0]
     for x in formulas[1:]:
-        formula = add_formula(BooleanFormula(BooleanFormula.And, formula, x))
+        formula = add_formula(BooleanFormula("&", formula, x))
     return formula
 
 
@@ -859,7 +755,7 @@ def translate_elements(elements, add_formula):
         formulas.append(create_formula(element.terms[0], add_formula))
         if len(element.condition) > 0:
             condition = translate_conjunction([add_formula(NumericLiteral(literal)) for literal in element.condition], add_formula)
-            formulas[-1] = add_formula(BooleanFormula(BooleanFormula.Ri, condition, formulas[-1]))
+            formulas[-1] = add_formula(BooleanFormula("->", condition, formulas[-1]))
 
     return translate_conjunction(formulas, add_formula)
 
