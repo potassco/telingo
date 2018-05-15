@@ -12,7 +12,7 @@ from operator import itemgetter as _itemgetter
 # {{{ data structures
 
 g_tel_false_atom = "__false"
-g_tel_keywords = ["true", "false", "final"]
+g_tel_keywords = ["true", "false", "final", "initial"]
 g_tel_shift_variable = "__S"
 
 def time_parameter(loc):
@@ -421,6 +421,7 @@ class TheoryAtomTransformer(_tf.Transformer):
         """
         Transforms one elementary theory elements without conditions into formulas.
         """
+        # NOTE: in principle this condition can be relaxed...
         if len(x.tuple) != 1 or len(x.condition) != 0:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
         x.tuple[0] = self(x.tuple[0], (0, 0))
@@ -432,10 +433,10 @@ class TheoryAtomTransformer(_tf.Transformer):
 
         The theory atom is renamed from tel to tel_head(__t) and the
         """
-        if len(x.elements) != 1 or x.guard is not None:
+        if x.guard is not None:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        x.term        = _ast.Function(x.term.location, "__tel_head", [time_parameter(x.term.location)], False)
-        x.elements[0] = self(x.elements[0])
+        x.term     = _ast.Function(x.term.location, "__tel_head", [time_parameter(x.term.location)], False)
+        x.elements = [self(elem) for elem in x.elements]
         return x
 
 def transform_theory_atom(x):

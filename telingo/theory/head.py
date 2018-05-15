@@ -51,6 +51,7 @@ class FormulaToStr(_tf.Transformer):
 def formula_to_str(x):
     return FormulaToStr()(x)
 
+# TODO: more sharing is possible here between body and head formulas
 TelNext = new_tuple("TelNext", ["lhs", "rhs", "weak"], ["rhs"], formula_to_str)
 TelUntil = new_tuple("TelUntil", ["lhs", "rhs", "until"], ["lhs", "rhs"], formula_to_str)
 TelAtom = new_tuple("TelAtom", ["positive", "name", "arguments"], ["arguments"], formula_to_str)
@@ -93,53 +94,40 @@ def create_formula(rep, add_formula):
     elif rep.type == _clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in g_binary_operators and len(args) == 2:
-            lhs = create_formula(args[0], add_formula)
-            rhs = create_formula(args[1], add_formula)
-            return add_formula(BooleanFormula(rep.name, lhs, rhs))
+            if rep.name in ("|", "&"):
+                lhs = create_formula(args[0], add_formula)
+                rhs = create_formula(args[1], add_formula)
+                return add_formula(TelClause([lhs, rhs], rep.name == "&"))
+            else:
+                raise RuntimeError("invalid temporal formula: {}".format(rep))
         elif rep.name in g_unary_operators and len(args) == 1:
             arg = create_formula(args[0], add_formula)
-            return add_formula(Negation(arg))
+            return add_formula(TelNegation(arg))
         elif rep.name in g_tel_operators:
+            if rep.name in ("<", "<:", "<;", "<:;", "<*", "<?", "<<"):
+                raise RuntimeError("invalid temporal formula: {}".format(rep))
             rhs = create_formula(args[-1], add_formula)
-            if rep.name == "<" or rep.name == "<:":
-                lhs = 1 if len(args) == 1 else create_number(args[0])
-                return rhs if lhs == 0 else add_formula(Previous(rhs, lhs, rep.name == "<:"))
-            elif rep.name == ">" or rep.name == ">:":
+            if rep.name == ">" or rep.name == ">:":
                 lhs = 1 if len(args) == 1 else create_number(args[0])
                 return rhs if lhs == 0 else add_formula(TelNext(lhs, rhs, rep.name == ">:"))
             lhs = None if len(args) == 1 else create_formula(args[0], add_formula)
-            if rep.name == "<;" or rep.name == "<:;":
-                return add_formula(BooleanFormula("&", Previous(lhs, 1, rep.name == "<:;"), rhs))
-            elif rep.name == "<*":
-                return add_formula(TelFormulaP("<*", lhs, rhs))
-            elif rep.name == "<?":
-                return add_formula(TelFormulaP("<?", lhs, rhs))
-            elif rep.name == "<<":
-                return add_formula(Initially(rhs))
-            elif rep.name == ";>" or rep.name == ";>:":
-                return add_formula(BooleanFormula("&", lhs, TelNext(1, rhs, rep.name == ";>:")))
-            elif rep.name == ">*":
-                formula = add_formula(TelFormulaN("<*", lhs, rhs))
-                formula.set_future(add_formula(TelNext(1, formula, True)))
-                return formula
-            elif rep.name == ">?":
-                formula = add_formula(TelFormulaN("<?", lhs, rhs))
-                formula.set_future(add_formula(Next(formula, 1, False)))
-                return formula
+            if rep.name in (";>", ";>:"):
+                return add_formula(TelClause([lhs, TelNext(1, rhs, rep.name == ";>:")], True))
+            elif rep.name in (">*", ">?"):
+                return add_formula(TelUntil(lhs, rhs, rep.name == ">?"))
             else:
                 assert(rep.name == ">>")
-                rhs = add_formula(BooleanFormula("|", add_formula(Negation(add_formula(TelAtom(True, "__final", [])))), rhs))
-                formula = add_formula(TelFormulaN("<*", None, rhs))
-                formula.set_future(add_formula(Next(formula, 1, True)))
-                return formula
+                final = add_formula(TelAtom(True, "__final", []))
+                rhs = add_formula(TelClause([add_formula(TelNegation(final)), rhs], False))
+                return add_formula(TelUntil(None, rhs, False))
         elif rep.name == "&":
             arg = rep.arguments[0]
             if arg.type == _clingo.TheoryTermType.Symbol:
                 if arg.name == "initial" or arg.name == "final":
                     name = "__{}".format(arg.name)
-                    return add_formula(TelAtom(True, name, []))
+                    return add_formula(TelNegation(TelNegation(TelAtom(True, name, []))))
                 elif arg.name == "true" or arg.name == "false":
-                    return add_formula(BooleanConstant(arg.name == "true"))
+                    return add_formula(TelConstant(arg.name == "true"))
                 else:
                     raise RuntimeError("unknown identifier: ".format(rep))
             else:
@@ -148,6 +136,7 @@ def create_formula(rep, add_formula):
             return create_atom(rep, add_formula, True)
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
+
 def translate_formula(atom, add_formula):
     '''
     - add the formula to the above variants

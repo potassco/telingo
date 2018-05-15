@@ -61,6 +61,7 @@ class TestHead(TestCase):
         self.assertEqual(transform_theory_atom("&true"), ('&__tel_head(__t) { &(true) :  }', []))
         self.assertEqual(transform_theory_atom("&false"), ('&__tel_head(__t) { &(false) :  }', []))
         self.assertEqual(transform_theory_atom("&final"), ('&__tel_head(__t) { &(final) :  }', []))
+        self.assertEqual(transform_theory_atom("&initial"), ('&__tel_head(__t) { &(initial) :  }', []))
         self.assertEqual(transform_theory_atom(">>a"), ('&__tel_head(__t) { >>(a) :  }', [((0, '#sup'), ['a(__t)'])]))
         self.assertEqual(transform_theory_atom("2+X>a"), ('&__tel_head(__t) { >(+(2,X),a) :  }', [(('(2+X)', '(2+X)'), ['a(__t)'])]))
 
