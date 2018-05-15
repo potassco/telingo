@@ -27,7 +27,7 @@ def theory_atoms(s):
     ctl.ground([("initial", [0, 0]), ("always", [0, 0])])
     ret = []
     for x in ctl.theory_atoms:
-        ret.append(";".join(map(str, create_formula(x))))
+        ret.append(str(hd.translate_formula(x, lambda y: y)))
     ret.sort()
     return ret
 
@@ -46,4 +46,4 @@ class TestTheoryHead(TestCase):
         self.assertEqual(theory_atoms("&tel { &true }."), ['&true'])
         self.assertEqual(theory_atoms("&tel { &false }."), ['&false'])
         self.assertEqual(theory_atoms("&tel { &initial }."), ['(~(~__initial))'])
-        self.assertEqual(theory_atoms("&tel { a;b }."), ['a;b'])
+        self.assertEqual(theory_atoms("&tel { a;b }."), ['(a|b)'])

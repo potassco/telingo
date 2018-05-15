@@ -137,21 +137,50 @@ def create_formula(rep, add_formula):
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
 
+class HeadFormula(Formula):
+    """
+    Class for temporal and Boolean formulas in rule heads.
+    """
+    def __init__(self, formula):
+        self.__formula = formula
+        self.__literals = []
+
+    @property
+    def _rep(self):
+        """
+        Return the unique string representaiton of the formula.
+        """
+        return self.__formula._rep
+
+    def translate(self, ctx, step):
+        """
+        Translates a formula at a given step.
+
+        Arguments:
+        ctx  -- Context object.
+        step -- Step at which to translate.
+        """
+        raise RuntimeError('implement me')
+
+    def add_literal(self, literal):
+        self.__literals.append(literal)
+
+    def __str__(self):
+        return str(self.__formula)
+
+    def __repr__(self):
+        return "HeadFormula({!r})".format(self.__formula)
+
 def translate_formula(atom, add_formula):
     '''
     - add the formula to the above variants
     - print the variants
-
-    - a named tuple might work here too..
     '''
-
     clause = []
     for x in atom.elements:
-        if x.condition:
-            raise RuntimeError('implement me: translate formula')
-        elif len(x.terms) != 1:
-            raise RuntimeError('implement me: translate formula')
+        if x.condition or len(x.terms) != 1:
+            raise RuntimeError('invalid temporal formula: {}'.format(atom))
         clause.append(create_formula(x.terms[0], add_formula))
-    formula = clause[0] if len(clause) == 1 else TelClause(atom.location, clause, False)
-    print (formula)
-    raise RuntimeError('implement me: translate formula')
+    formula = HeadFormula(clause[0] if len(clause) == 1 else TelClause(clause, False))
+    formula.add_literal(atom.literal)
+    return formula
