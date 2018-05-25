@@ -201,7 +201,7 @@ class HeadFormula(Formula):
         step -- Step at which to translate.
         """
         shifted = shift_formula(self.__formula, step - self.__timestep)
-        print """\
+        print ("""\
 The formula
   {}
 is shifted
@@ -220,7 +220,7 @@ can be unpacked in the future. There can be no more derivations if all next
 operators have been unpacked and no inductive temporal operator has been
 unpacked. As a further optimization, subformulas not referring to a positive
 atom can be preceded by double negation and do not have to be unpacked at all.
-""".format(self, step, self.__timestep, step - self.__timestep, shifted)
+""".format(self, step, self.__timestep, step - self.__timestep, shifted))
         raise RuntimeError('implement me')
 
     def add_literal(self, literal):
