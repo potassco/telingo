@@ -48,16 +48,24 @@ class FormulaToStr(_tf.Transformer):
     def visit_TelConstant(self, x):
         return "&true" if x.value else "&false"
 
+    def visit_TelShift(self, x):
+        if x.lhs == 0:
+            return "(~(~{})".format(x.rhs)
+        elif x.lhs < 0:
+            return "(~(~({}<{}))".format(-x.lhs, x.rhs)
+        elif x.lhs > 0:
+            return "(~(~({}>{}))".format(x.lhs, x.rhs)
+
 def formula_to_str(x):
     return FormulaToStr()(x)
 
-# TODO: more sharing is possible here between body and head formulas
 TelNext = new_tuple("TelNext", ["lhs", "rhs", "weak"], ["rhs"], formula_to_str)
 TelUntil = new_tuple("TelUntil", ["lhs", "rhs", "until"], ["lhs", "rhs"], formula_to_str)
 TelAtom = new_tuple("TelAtom", ["positive", "name", "arguments"], ["arguments"], formula_to_str)
 TelClause = new_tuple("TelClause", ["elements", "conjunctive"], ["elements"], formula_to_str)
 TelNegation = new_tuple("TelNegation", ["rhs"], ["rhs"], formula_to_str)
 TelConstant = new_tuple("TelConstant", ["value"], [], formula_to_str)
+TelShift = new_tuple("TelShift", ["lhs", "rhs"], [], formula_to_str)
 
 def create_atom(rep, add_formula, positive):
     """
@@ -137,12 +145,44 @@ def create_formula(rep, add_formula):
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
 
+class ShiftFormula(_tf.Transformer):
+    """
+    Shifts the given formula
+    """
+    def __init__(self, shift):
+        self.__shift = shift
+
+    def visit_TelAtom(self, x):
+        return x if self.__shift == 0 else TelShift(self.__shift, x)
+
+    def visit_TelNext(self, x):
+        if x.lhs <= self.__shift:
+            return shift_formula(x.rhs, self.__shift - x.lhs)
+        else:
+            return TelShift(x.lhs - self.__shift, x.rhs)
+
+    def visit_TelUntil(self, x):
+        raise RuntimeError("ShiftFormula.visit_TelUntil: apply inductive definition")
+
+    def visit_TelClause(self, x):
+        return TelClause(self(x.elements), x.conjunctive)
+
+    def visit_TelNegation(self, x):
+        return TelShift(-self.__shift, x)
+
+    def visit_TelConstant(self, x):
+        return TelShift(-self.__shift, x)
+
+def shift_formula(x, shift):
+    return ShiftFormula(shift)(x)
+
 class HeadFormula(Formula):
     """
     Class for temporal and Boolean formulas in rule heads.
     """
-    def __init__(self, formula):
+    def __init__(self, timestep, formula):
         self.__formula = formula
+        self.__timestep = timestep
         self.__literals = []
 
     @property
@@ -150,7 +190,7 @@ class HeadFormula(Formula):
         """
         Return the unique string representaiton of the formula.
         """
-        return self.__formula._rep
+        return ("head", self.__timestep, self.__formula._rep)
 
     def translate(self, ctx, step):
         """
@@ -160,16 +200,37 @@ class HeadFormula(Formula):
         ctx  -- Context object.
         step -- Step at which to translate.
         """
+        shifted = shift_formula(self.__formula, step - self.__timestep)
+        print """\
+The formula
+  {}
+is shifted
+  {}-{}={}
+times resulting in
+  {}.
+Then the formula can be converted normal rules. This involves bringing it into
+clausal form, where every negated occurrence of a formula is shifted into a
+rule body.
+
+This translation involves creating temporal formulas occuring in rule bodies,
+which have to be translated too.
+
+Finally, the same formula has to be added to the todo list if more derivations
+can be unpacked in the future. There can be no more derivations if all next
+operators have been unpacked and no inductive temporal operator has been
+unpacked. As a further optimization, subformulas not referring to a positive
+atom can be preceded by double negation and do not have to be unpacked at all.
+""".format(self, step, self.__timestep, step - self.__timestep, shifted)
         raise RuntimeError('implement me')
 
     def add_literal(self, literal):
         self.__literals.append(literal)
 
     def __str__(self):
-        return str(self.__formula)
+        return "{}@{}".format(self.__formula, self.__timestep)
 
     def __repr__(self):
-        return "HeadFormula({!r})".format(self.__formula)
+        return "HeadFormula({!r},{!r})".format(self.__timestep, self.__formula)
 
 def translate_formula(atom, add_formula):
     '''
@@ -181,6 +242,6 @@ def translate_formula(atom, add_formula):
         if x.condition or len(x.terms) != 1:
             raise RuntimeError('invalid temporal formula: {}'.format(atom))
         clause.append(create_formula(x.terms[0], add_formula))
-    formula = HeadFormula(clause[0] if len(clause) == 1 else TelClause(clause, False))
+    formula = HeadFormula(atom.term.arguments[0].number, clause[0] if len(clause) == 1 else TelClause(clause, False))
     formula.add_literal(atom.literal)
     return formula
