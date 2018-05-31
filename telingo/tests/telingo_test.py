@@ -263,3 +263,8 @@ class TestMain(TestCase):
 
     def test_head(self):
         self.assertEqual(solve("{body}. &tel { (a & b) | (c & (d | f)) } :- body."), [[], ['a(0)', 'b(0)', 'body(0)'], ['body(0)', 'c(0)', 'd(0)'], ['body(0)', 'c(0)', 'f(0)']])
+        self.assertEqual(solve("#program initial. &tel { > b & b | > > c}. #program always. s.", imin=3),
+            [ ['b(0)', 'b(1)', 's(0)', 's(1)']
+            , ['b(0)', 'b(1)', 's(0)', 's(1)', 's(2)']
+            , ['c(2)', 's(0)', 's(1)', 's(2)']
+            ])

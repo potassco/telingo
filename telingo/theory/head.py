@@ -154,7 +154,7 @@ class ShiftFormula(_tf.Transformer):
         self.__shift = shift
 
     def visit_TelAtom(self, x):
-        return x if self.__shift == 0 else TelShift(self.__shift, x)
+        return x if self.__shift == 0 else TelShift(-self.__shift, x)
 
     def visit_TelNext(self, x):
         if x.lhs <= self.__shift:
@@ -203,10 +203,10 @@ class HeadFormulaToBodyFormula(_tf.Transformer):
         self.__add_formula = add_formula
 
     def visit_TelAtom(self, x):
-        raise RuntimeError("visit_TelAtom: implement me")
+        return self.__add_formula(_bd.Atom(x.name, x.arguments, x.positive))
 
     def visit_TelNext(self, x):
-        raise RuntimeError("visit_TelNext: implement me")
+        return self.__add_formula(_bd.Next(self(x.rhs), x.lhs, x.weak))
 
     def visit_TelUntil(self, x):
         raise RuntimeError("visit_TelUntil: implement me")
@@ -219,9 +219,6 @@ class HeadFormulaToBodyFormula(_tf.Transformer):
 
     def visit_TelConstant(self, x):
         raise RuntimeError("visit_TelConstant: implement me")
-
-    def visit_TelShift(self, x):
-        raise RuntimeError("visit_TelShift: implement me")
 
 def head_formula_to_body_formula(x, add_formula):
     return HeadFormulaToBodyFormula(add_formula)(x)
@@ -238,8 +235,12 @@ class ClauseToRule(_tf.Transformer):
             self.__head.append(atom.literal)
 
     def visit_TelShift(self, x, ctx, step):
-        formula = head_formula_to_body_formula(x, ctx.add_formula)
-        self.__body.append(formula.translate(ctx, step))
+        stp = _bd.Next if x.lhs > 0 else _bd.Previous
+        neg = lambda x: ctx.add_formula(_bd.Negation(x))
+        nxt = lambda l, r: ctx.add_formula(stp(r, abs(l), False))
+        rhs = head_formula_to_body_formula(x.rhs, ctx.add_formula)
+        frm = neg(nxt(x.lhs, rhs))
+        self.__body.append(frm.translate(ctx, step))
 
 def translate_clause(clause, ctx, step, body_literal):
     head = []
