@@ -192,7 +192,7 @@ class UnfoldFormula(_tf.Transformer):
 
     def visit_TelClause(self, x):
         elements = map(self, x.elements)
-        # NOTE: list is mapped over the elements to make sure that iterators are consumed only ones
+        # NOTE: list is mapped over the elements to make sure that iterators are consumed only once
         return map(list, _it.chain(*elements) if x.conjunctive else _it.starmap(_it.chain, _it.product(*elements)))
 
 def unfold_formula(x):
