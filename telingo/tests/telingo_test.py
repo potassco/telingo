@@ -260,3 +260,6 @@ class TestMain(TestCase):
         self.assertEqual(
             solve("{ p(1..3); q(1..3) }. :-        p(X) : q(X)."),
             solve("{ p(1..3); q(1..3) }. :- &tel { p(X) : q(X) }."), [])
+
+    def test_head(self):
+        self.assertEqual(solve("{body}. &tel { (a & b) | (c & (d | f)) } :- body."), [[], ['a(0)', 'b(0)', 'body(0)'], ['body(0)', 'c(0)', 'd(0)'], ['body(0)', 'c(0)', 'f(0)']])

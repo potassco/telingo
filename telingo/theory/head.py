@@ -8,6 +8,7 @@ from telingo.transformers import transformer as _tf
 from collections import namedtuple as _namedtuple
 from . import body as _bd
 from .formula import *
+import itertools as _it
 
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
@@ -147,7 +148,7 @@ def create_formula(rep, add_formula):
 
 class ShiftFormula(_tf.Transformer):
     """
-    Shifts the given formula
+    Shifts the given formula.
     """
     def __init__(self, shift):
         self.__shift = shift
@@ -179,6 +180,47 @@ class ShiftFormula(_tf.Transformer):
 def shift_formula(x, shift):
     return ShiftFormula(shift)(x)
 
+class UnfoldFormula(_tf.Transformer):
+    """
+    Unfolds the given formula into normal rules.
+    """
+    def visit_TelAtom(self, x):
+        return [[x]]
+
+    def visit_TelShift(self, x):
+        return [[x]]
+
+    def visit_TelClause(self, x):
+        elements = map(self, x.elements)
+        # NOTE: list is mapped over the elements to make sure that iterators are consumed only ones
+        return map(list, _it.chain(*elements) if x.conjunctive else _it.starmap(_it.chain, _it.product(*elements)))
+
+def unfold_formula(x):
+    return UnfoldFormula()(x)
+
+class ClauseToRule(_tf.Transformer):
+    def __init__(self, head, body):
+        self.__head = head
+        self.__body = body
+
+    def visit_TelAtom(self, x, ctx, step):
+        sym  = _clingo.Function(x.name, x.arguments + [step], x.positive)
+        atom = ctx.symbols[sym]
+        if atom is not None:
+            self.__head.append(atom.literal)
+
+    def visit_TelShift(self, x, ctx, step):
+        # TODO TODO TODO
+        raise RuntimeError("implement translation of body atoms")
+        self.__body.append(TelShift(x.lhs, TelNegation(x.rhs)))
+
+def translate_clause(clause, ctx, step, body_literal):
+    head = []
+    body = [body_literal]
+    for lit in clause:
+        ClauseToRule(head, body)(lit, ctx, step)
+    ctx.backend.add_rule(head, body)
+
 class HeadFormula(Formula):
     """
     Class for temporal and Boolean formulas in rule heads.
@@ -199,32 +241,37 @@ class HeadFormula(Formula):
         """
         Translates a formula at a given step.
 
+        The formula is first shifted (everything not referring to the current
+        time step is double negated).  Then the formula can be converted to
+        normal rules. This brings it into clausal form, where every negated
+        occurrence of a formula is shifted into a rule body.
+
         Arguments:
         ctx  -- Context object.
         step -- Step at which to translate.
+
+        Possible Future Optimizations:
+        - There can be no more derivations if all next operators have been
+          unpacked and no inductive temporal operator has been unpacked.
+        - Subformulas not referring to a positive atom can be preceded by
+          double negation and do not have to be unpacked at all.
+        - To make the translations practical, formulas should be factored in a
+          way so that become more compact. The current proof-of-concept
+          translation does not pay much mind to this.
         """
         shifted = shift_formula(self.__formula, step - self.__timestep)
-        print ("""\
-The formula
-  {}
-is shifted
-  {}-{}={}
-times resulting in
-  {}.
-Then the formula can be converted normal rules. This involves bringing it into
-clausal form, where every negated occurrence of a formula is shifted into a
-rule body.
+        undfolded = unfold_formula(shifted)
 
-This translation involves creating temporal formulas occuring in rule bodies,
-which have to be translated too.
+        if len(self.__literals) > 1:
+            body = backend.atom()
+            for x in self.__literals:
+                backend.add_rule(body, [x])
+            self.__literals = [body]
 
-Finally, the same formula has to be added to the todo list if more derivations
-can be unpacked in the future. There can be no more derivations if all next
-operators have been unpacked and no inductive temporal operator has been
-unpacked. As a further optimization, subformulas not referring to a positive
-atom can be preceded by double negation and do not have to be unpacked at all.
-""".format(self, step, self.__timestep, step - self.__timestep, shifted))
-        raise RuntimeError('implement me')
+        for clause in undfolded:
+            translate_clause(clause, ctx, step, self.__literals[0])
+
+        ctx.add_todo(self, step+1)
 
     def add_literal(self, literal):
         self.__literals.append(literal)
