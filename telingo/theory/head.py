@@ -162,7 +162,10 @@ class ShiftFormula(_tf.Transformer):
             return TelShift(x.lhs - self.__shift, x.rhs)
 
     def visit_TelUntil(self, x):
-        raise RuntimeError("ShiftFormula.visit_TelUntil: apply inductive definition")
+        inner = TelNext(1, x, False)
+        if x.lhs is not None:
+            inner = TelClause([x.lhs, inner], x.until)
+        return shift_formula(TelClause([x.rhs, inner], not x.until), self.__shift)
 
     def visit_TelClause(self, x):
         return TelClause(self(x.elements), x.conjunctive)
