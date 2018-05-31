@@ -91,8 +91,8 @@ atoms in rule heads:
 - Other formulas
   - `&true` (Boolean constant true) *[head]*
   - `&false` (`~ &true`) *[head]*
-  - `&initial` (`~ > &true`)
-  - `&final` (`~ < &true`) *[head]*
+  - `&initial` (`~ < &true`) *[head]*
+  - `&final` (`~ > &true`) *[head]*
   - `<< p` (initially: `<* (~ &initial | p)`)
   - `>> p` (finally: `>* (~ &final | p)`)
 
