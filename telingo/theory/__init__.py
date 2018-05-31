@@ -89,6 +89,6 @@ class Theory:
         if len(self.__todo) > 0:
             todo, self.__todo, self.__todo_keys = self.__todo, [], set()
             with prg.backend() as b:
-                ctx = _frm.Context(b, prg.symbolic_atoms, self.add_todo, self.false_literal, horizon)
+                ctx = _frm.Context(b, prg.symbolic_atoms, self.add_todo, self.add_formula, self.false_literal, horizon)
                 for step, formula in todo:
                     formula.translate(ctx, step)

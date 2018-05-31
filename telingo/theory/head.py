@@ -198,6 +198,34 @@ class UnfoldFormula(_tf.Transformer):
 def unfold_formula(x):
     return UnfoldFormula()(x)
 
+class HeadFormulaToBodyFormula(_tf.Transformer):
+    def __init__(self, add_formula):
+        self.__add_formula = add_formula
+
+    def visit_TelAtom(self, x):
+        raise RuntimeError("visit_TelAtom: implement me")
+
+    def visit_TelNext(self, x):
+        raise RuntimeError("visit_TelNext: implement me")
+
+    def visit_TelUntil(self, x):
+        raise RuntimeError("visit_TelUntil: implement me")
+
+    def visit_TelClause(self, x):
+        raise RuntimeError("visit_TelClause: implement me")
+
+    def visit_TelNegation(self, x):
+        raise RuntimeError("visit_TelNegation: implement me")
+
+    def visit_TelConstant(self, x):
+        raise RuntimeError("visit_TelConstant: implement me")
+
+    def visit_TelShift(self, x):
+        raise RuntimeError("visit_TelShift: implement me")
+
+def head_formula_to_body_formula(x, add_formula):
+    return HeadFormulaToBodyFormula(add_formula)(x)
+
 class ClauseToRule(_tf.Transformer):
     def __init__(self, head, body):
         self.__head = head
@@ -210,9 +238,8 @@ class ClauseToRule(_tf.Transformer):
             self.__head.append(atom.literal)
 
     def visit_TelShift(self, x, ctx, step):
-        # TODO TODO TODO
-        raise RuntimeError("implement translation of body atoms")
-        self.__body.append(TelShift(x.lhs, TelNegation(x.rhs)))
+        formula = head_formula_to_body_formula(x, ctx.add_formula)
+        self.__body.append(formula.translate(ctx, step))
 
 def translate_clause(clause, ctx, step, body_literal):
     head = []

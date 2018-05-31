@@ -44,7 +44,7 @@ class Context:
     horizon         -- Current search horizon.
     __false_literal -- Function to obtain a false literal.
     """
-    def __init__(self, backend, symbols, add_todo, false_literal, horizon):
+    def __init__(self, backend, symbols, add_todo, add_formula, false_literal, horizon):
         """
         Initializes the context.
 
@@ -55,6 +55,7 @@ class Context:
         false_literal -- Function to obtain a false literal.
         """
         self.add_todo        = add_todo
+        self.add_formula     = add_formula
         self.backend         = backend
         self.symbols         = symbols
         self.horizon         = horizon
