@@ -97,7 +97,9 @@ atoms in rule heads:
   - `>> p` (finally: `>* (~ &final | p)`)
 
 The elements of `&tel` atoms are treated like conditional literals in clingo.
-The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`.
+The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`. At the
+moment conditions are only supported in rule bodies; future `telingo` versions
+might add support for conditions in rule heads.
 
 ## Example I
 
