@@ -60,15 +60,16 @@ The following temporal formulas are supported in rule heads and body literals:
 
 The following temporal formulas are accepted in constraints and behind default
 negation between the braces of theory atoms of form `&tel { ... }` (see the
-second example below):
+second example below). Formulas marked with *[head]* can also be used in `&tel`
+atoms in rule heads:
 
 - Boolean formulas
-  - `a & b` (conjunction)
-  - `a | b` (disjunction)
+  - `a & b` (conjunction) *[head]*
+  - `a | b` (disjunction) *[head]*
   - `a <- b` (left implication)
   - `a -> b` (right implication)
   - `a <> b` (equivalence)
-  - `~ a` (negation)
+  - `~ a` (negation) *[head]*
 - Formulas referring to the past
   - `< a` (previous)
   - `<: a` (weak previous)
@@ -79,23 +80,23 @@ second example below):
   - `a <; b` (sequence: `a & (< b)`)
   - `a <:; b` (sequence: `a & (<: b)`)
 - Formulas referring to the future
-  - `> a` (next)
-  - `>: a` (weak next)
-  - `a >* b` (release)
-  - `>* b` (always after)
-  - `a >? b` (until)
-  - `>? b` (eventually after)
-  - `a ;> b` (sequence: `a & (> b)`)
-  - `a ;>: b` (sequence: `a & (>: b)`)
+  - `> a` (next) *[head]*
+  - `>: a` (weak next) *[head]*
+  - `a >* b` (release) *[head]*
+  - `>* b` (always after) *[head]*
+  - `a >? b` (until) *[head]*
+  - `>? b` (eventually after) *[head]*
+  - `a ;> b` (sequence: `a & (> b)`) *[head]*
+  - `a ;>: b` (sequence: `a & (>: b)`) *[head]*
 - Other formulas
-  - `&true` (Boolean constant true)
-  - `&false` (`~ &true`)
+  - `&true` (Boolean constant true) *[head]*
+  - `&false` (`~ &true`) *[head]*
   - `&initial` (`~ > &true`)
-  - `&final` (`~ < &true`)
+  - `&final` (`~ < &true`) *[head]*
   - `<< p` (initially: `<* (~ &initial | p)`)
   - `>> p` (finally: `>* (~ &final | p)`)
 
-The elements of &tel atoms are treated like conditional literals in clingo.
+The elements of `&tel` atoms are treated like conditional literals in clingo.
 The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`.
 
 ## Example I
