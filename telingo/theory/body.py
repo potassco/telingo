@@ -231,7 +231,7 @@ class BooleanConstant(BodyFormula):
 
 class Negation(BodyFormula):
     """
-    Formula capturing (classical) negation.
+    Formula capturing (default) negation.
 
     Members:
     __arg -- Formula to negate.

@@ -268,3 +268,25 @@ class TestMain(TestCase):
             , ['b(0)', 'b(1)', 's(0)', 's(1)', 's(2)']
             , ['c(2)', 's(0)', 's(1)', 's(2)']
             ])
+        self.assertEqual(solve("{c}. &tel { a | ~c }."), [[], ['a(0)', 'c(0)']])
+        self.assertEqual(solve("{c}. &tel { a | ~ ~c }."), [['a(0)'], ['c(0)']])
+        self.assertEqual(solve("&tel { a | &true }."), [[]])
+        self.assertEqual(solve("&tel { a | &false }."), [['a(0)']])
+        self.assertEqual(solve("{a;b;c}. &tel { ~(a & b & c) }."),
+            [ []
+            , ['a(0)']
+            , ['a(0)', 'b(0)']
+            , ['a(0)', 'c(0)']
+            , ['b(0)']
+            , ['b(0)', 'c(0)']
+            , ['c(0)']
+            ])
+        self.assertEqual(solve("&tel { >* a & > > b }.", always=False), [['a(0)', 'a(1)', 'a(2)', 'b(2)']])
+        self.assertEqual(solve("&tel { >? a & > > b }.", always=False), [['a(0)', 'b(2)'], ['a(1)', 'b(2)'], ['a(2)', 'b(2)']])
+        self.assertEqual(solve("#program initial. &tel { > > c }.  &tel { >? b }. #program always. &tel { >* a } :- b."),
+            [ ['a(0)', 'a(1)', 'a(2)', 'b(0)', 'c(2)']
+            , ['a(1)', 'a(2)', 'b(1)', 'c(2)']
+            , ['a(2)', 'b(2)', 'c(2)']
+            ])
+        # TODO: test binary until and release too
+

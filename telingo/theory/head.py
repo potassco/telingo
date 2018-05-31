@@ -9,6 +9,7 @@ from collections import namedtuple as _namedtuple
 from . import body as _bd
 from .formula import *
 import itertools as _it
+import functools as _ft
 
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
@@ -160,10 +161,10 @@ class ShiftFormula(_tf.Transformer):
         if x.lhs <= self.__shift:
             return shift_formula(x.rhs, self.__shift - x.lhs)
         else:
-            return TelShift(x.lhs - self.__shift, x.rhs)
+            return TelShift(0, TelNext(x.lhs - self.__shift, x.rhs, x.weak))
 
     def visit_TelUntil(self, x):
-        inner = TelNext(1, x, False)
+        inner = TelNext(1, x, not x.until)
         if x.lhs is not None:
             inner = TelClause([x.lhs, inner], x.until)
         return shift_formula(TelClause([x.rhs, inner], not x.until), self.__shift)
@@ -209,16 +210,20 @@ class HeadFormulaToBodyFormula(_tf.Transformer):
         return self.__add_formula(_bd.Next(self(x.rhs), x.lhs, x.weak))
 
     def visit_TelUntil(self, x):
-        raise RuntimeError("visit_TelUntil: implement me")
+        formula = self.__add_formula(_bd.TelFormulaN(">?", None if x.lhs is None else self(x.lhs), self(x.rhs)))
+        formula.set_future(self.__add_formula(_bd.Next(formula, 1, False)))
+        return formula
 
     def visit_TelClause(self, x):
-        raise RuntimeError("visit_TelClause: implement me")
+        op = "&" if x.conjunctive else "|"
+        elements = map(self, x.elements)
+        return _ft.reduce(lambda l, r: _bd.BooleanFormula(op, l, r), elements)
 
     def visit_TelNegation(self, x):
-        raise RuntimeError("visit_TelNegation: implement me")
+        return self.__add_formula(_bd.Negation(self(x.rhs)))
 
     def visit_TelConstant(self, x):
-        raise RuntimeError("visit_TelConstant: implement me")
+        return self.__add_formula(_bd.BooleanConstant(x.value))
 
 def head_formula_to_body_formula(x, add_formula):
     return HeadFormulaToBodyFormula(add_formula)(x)
@@ -235,7 +240,9 @@ class ClauseToRule(_tf.Transformer):
             self.__head.append(atom.literal)
 
     def visit_TelShift(self, x, ctx, step):
-        stp = _bd.Next if x.lhs > 0 else _bd.Previous
+        stp = lambda x, n, w: x
+        if x.lhs != 0:
+            stp = _bd.Next if x.lhs > 0 else _bd.Previous
         neg = lambda x: ctx.add_formula(_bd.Negation(x))
         nxt = lambda l, r: ctx.add_formula(stp(r, abs(l), False))
         rhs = head_formula_to_body_formula(x.rhs, ctx.add_formula)
