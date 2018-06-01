@@ -1,10 +1,10 @@
 # Telingo
 
-`Telingo` is a solver for temporal programs. It leaverages `clingo`'s input
+*Telingo* is a solver for temporal programs. It leaverages *clingo*'s input
 language and scripting cababilities to parse and solve programs with temporal
-formulas. As such the input of `telingo` is valid `clingo` input supporting all
-clingo language features like for example aggregates; only the way programs are
-grounded and solved is adjusted.
+formulas. As such the input of *telingo* is valid *clingo* input supporting all
+*clingo* language features like for example aggregates; only the way programs
+are grounded and solved is adjusted.
 
 # Usage
 
@@ -13,23 +13,23 @@ telingo --help
 telingo examples/example1.lp
 ```
 
-To use `telingo` directly from source run `python -m telingo` from the
+To use *telingo* directly from source run `python -m telingo` from the
 project's root directory.
 
 # Installation
 
-Either run `telingo` directly from source or install it by the usual means
-provided by Python.  We also provide anaconda packages for easy installation of
+Either run *telingo* directly from source or install it by the usual means
+provided by Python. We also provide anaconda packages for easy installation of
 all dependencies:
 
 - <https://anaconda.org/potassco/telingo>
 
 ## Warning
 
-Currently `telingo` only works with the upcoming 5.3 version of `clingo`. So
-for now the work-in-progress (wip) branch of `clingo` has to be used. If
+Currently *telingo* only works with the upcoming 5.3 version of *clingo*. So
+for now the work-in-progress (wip) branch of *clingo* has to be used. If
 installing with anaconda, make sure to install the development packages of
-clingo.
+*clingo*.
 
 # Input
 
@@ -96,9 +96,9 @@ atoms in rule heads:
   - `<< p` (initially: `<* (~ &initial | p)`)
   - `>> p` (finally: `>* (~ &final | p)`)
 
-The elements of `&tel` atoms are treated like conditional literals in clingo.
+The elements of `&tel` atoms are treated like conditional literals in *clingo*.
 The rule `:- &tel { p(X) : q(X) }.` is equivalent to `:- p(X) : q(X).`. At the
-moment conditions are only supported in rule bodies; future `telingo` versions
+moment conditions are only supported in rule bodies; future *telingo* versions
 might add support for conditions in rule heads.
 
 ## Example I
@@ -122,7 +122,7 @@ unloaded :- 'unloaded, not loaded.
 unloaded.
 ```
 
-By default `telingo` stops unfolding states as soon as an answer set is found.
+By default *telingo* stops unfolding states as soon as an answer set is found.
 Running with option `--imin=2` results in the following output:
 
 ```
