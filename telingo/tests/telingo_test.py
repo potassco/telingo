@@ -288,5 +288,10 @@ class TestMain(TestCase):
             , ['a(1)', 'a(2)', 'b(1)', 'c(2)']
             , ['a(2)', 'b(2)', 'c(2)']
             ])
+        self.assertEqual(solve("&tel { >? >* a }. #program always. c.", always=False, imin=3),
+            [ ['a(0)', 'c(0)']
+            , ['a(1)', 'c(0)', 'c(1)']
+            , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
+            ])
         # TODO: test binary until and release too
 
