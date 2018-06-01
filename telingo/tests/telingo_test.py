@@ -303,9 +303,28 @@ class TestMain(TestCase):
             , ['a(1)', 'c(0)', 'c(1)']
             , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
             ])
-
         self.assertEqual(solve("&tel { >* c }.  &tel { >> a }.", always=False, imin=3),
             [ ['a(0)', 'c(0)']
             , ['a(1)', 'c(0)', 'c(1)']
             , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
+            ])
+        self.assertEqual(solve("&tel { a ;> b ;> c }.", always=False), [['a(0)', 'b(1)', 'c(2)']])
+        self.assertEqual(solve("&tel { a ;>: b ;>: c }.", always=False, imin=3), [['a(0)'], ['a(0)', 'b(1)'], ['a(0)', 'b(1)', 'c(2)']])
+        self.assertEqual(solve("&tel { >* (&final | a) }. &tel { >* b }.", always=False, imin=3),
+            [ ['a(0)', 'a(1)', 'b(0)', 'b(1)', 'b(2)']
+            , ['a(0)', 'b(0)', 'b(1)']
+            , ['b(0)']
+            ])
+        self.assertEqual(solve("&tel { >* (&initial | a) }. &tel { >* b }.", always=False, imin=3),
+            [ ['a(1)', 'a(2)', 'b(0)', 'b(1)', 'b(2)']
+            , ['a(1)', 'b(0)', 'b(1)']
+            , ['b(0)']
+            ])
+        self.assertEqual(solve("&tel { 2 > a }. &tel { >* b }.", always=False),
+            [ ['a(2)', 'b(0)', 'b(1)', 'b(2)']
+            ])
+        self.assertEqual(solve("&tel { 2 >: a }. &tel { >* b }.", always=False, imin=3),
+            [ ['a(2)', 'b(0)', 'b(1)', 'b(2)']
+            , ['b(0)']
+            , ['b(0)', 'b(1)']
             ])
