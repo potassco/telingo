@@ -303,3 +303,9 @@ class TestMain(TestCase):
             , ['a(1)', 'c(0)', 'c(1)']
             , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
             ])
+
+        self.assertEqual(solve("&tel { >* c }.  &tel { >> a }.", always=False, imin=3),
+            [ ['a(0)', 'c(0)']
+            , ['a(1)', 'c(0)', 'c(1)']
+            , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
+            ])
