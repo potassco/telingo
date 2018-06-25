@@ -199,4 +199,14 @@ class ProgramTransformer(_tf.Transformer):
         sig.arity += 1
         return sig
 
+    def visit_Input(self, sig):
+        """
+        Adjusts the arity of input predicate statements.
+
+        See visit_ShowSignature.
+        """
+        sig.arity += 1
+        return sig
+
+
 

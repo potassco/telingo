@@ -23,10 +23,10 @@ at(X,A) :- 'at(X,A), not at(X,B), opp(A,B).
 % Choose moving at most one item
 0 {m(X):item(X)} 1.
 
-#program always.
-
 % Executability: we cannot move item X if at the opposite bank
 :- m(X), 'at(b,A), 'at(X,B), opp(A,B). 
+
+#program always.
 
 % Unique value constraint: X cannot be at both banks
 %:- at(X,A), at(X,B), A!=B.
