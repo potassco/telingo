@@ -24,13 +24,6 @@ all dependencies:
 
 - <https://anaconda.org/potassco/telingo>
 
-## Warning
-
-Currently *telingo* only works with the upcoming 5.3 version of *clingo*. So
-for now the work-in-progress (wip) branch of *clingo* has to be used. If
-installing with anaconda, make sure to install the development packages of
-*clingo*.
-
 # Input
 
 To refer to an atom in the previous state, the atom name has to be prefixed
