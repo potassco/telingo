@@ -19,6 +19,7 @@ g_time_parameter_name_alt -- Prefix for the second time parameter used when
                              grounding rules within a given range.
 """
 
+import clingo as _clingo
 from clingo import ast as _ast
 
 g_future_prefix = "__future_"
@@ -129,3 +130,8 @@ class Transformer:
         """
         return self.visit(x, *args, **kwargs)
 
+_version = _clingo.__version__.split(".")
+if int(_version[0]) >= 5 and int(_version[1]) >= 4:
+    External = lambda loc, head, body: _ast.External(loc, head, body, _ast.Function(loc, "false", [], False))
+else:
+    External = _ast.External

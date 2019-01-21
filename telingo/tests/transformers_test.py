@@ -168,7 +168,7 @@ def transform(p):
     r = []
     def append(s):
         if s.type != ast.ASTType.TheoryDefinition:
-            r.append(str(s))
+            r.append(str(s).replace(". [false]", "."))
     f, c = _tfs.transform([p], append)
     return r, f, c
 

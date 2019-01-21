@@ -30,7 +30,7 @@ def transform_theory_atom(s):
 
 def transform(s):
     atom, rules = th.HeadTransformer().transform(parse_formula(s))
-    return (str(atom), [str(rule) for rule in rules])
+    return (str(atom), [str(rule).replace(". [false]", ".") for rule in rules])
 
 class TestHead(TestCase):
     def test_atom(self):

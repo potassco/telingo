@@ -145,7 +145,7 @@ def transform(inputs, callback):
         atom = wrap(_ast.SymbolicAtom(_ast.Function(loc, atom_name, [time], False)))
         callback(statement(loc, atom, []))
     add_part('initial', '__initial', _ast.Rule, wrap_lit)
-    add_part('always', '__final', _ast.External)
+    add_part('always', '__final', _tf.External)
 
     reground_parts.append(('always',  'always',  range(1)))
     reground_parts.append(('dynamic', 'dynamic', range(1)))

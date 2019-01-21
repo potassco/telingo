@@ -554,7 +554,7 @@ class HeadTransformer:
         rules        = []
 
         if self.__false_external is None:
-            rules.append(_ast.External(loc, false.atom, []))
+            rules.append(_tf.External(loc, false.atom, []))
 
         rules.append(_ast.Rule(loc, atom, [aux]))
 
