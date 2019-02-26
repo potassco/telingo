@@ -25,7 +25,7 @@ class FormulaToStr(_tf.Transformer):
     Converts head formuals to string.
     """
     def visit_TelAtom(self, x):
-        args = "" if len(x.arguments) == 0 else "({})".format(",".join(map(self, x.arguments)))
+        args = "" if len(x.arguments) == 0 else "({})".format(",".join(map(str, x.arguments)))
         sign = "" if x.positive else "-"
         return "{}{}{}".format(sign, x.name, args)
 

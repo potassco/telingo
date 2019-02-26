@@ -309,6 +309,8 @@ class TestMain(TestCase):
             , ['a(2)', 'c(0)', 'c(1)', 'c(2)']
             ])
         self.assertEqual(solve("&tel { a ;> b ;> c }.", always=False), [['a(0)', 'b(1)', 'c(2)']])
+        self.assertEqual(solve("&tel { a(1) ;> b(2) ;> c(3) }.", always=False), [['a(1,0)', 'b(2,1)', 'c(3,2)']])
+        self.assertEqual(solve("&tel { a(X) ;> b(X) ;> c(X) } :- X=(1;2).", always=False), [['a(1,0)', 'a(2,0)', 'b(1,1)', 'b(2,1)', 'c(1,2)', 'c(2,2)']])
         self.assertEqual(solve("&tel { a ;>: b ;>: c }.", always=False, imin=3), [['a(0)'], ['a(0)', 'b(1)'], ['a(0)', 'b(1)', 'c(2)']])
         self.assertEqual(solve("&tel { >* (&final | a) }. &tel { >* b }.", always=False, imin=3),
             [ ['a(0)', 'a(1)', 'b(0)', 'b(1)', 'b(2)']
