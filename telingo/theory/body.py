@@ -4,6 +4,7 @@ rule bodies to rules via clingo's backend.
 """
 
 import clingo as _clingo
+from telingo.util import getattr_
 
 from .formula import *
 
@@ -456,7 +457,9 @@ class Next(BodyFormula):
                 data.done = True
             else:
                 data.literal = ctx.backend.add_atom()
-                ctx.backend.add_external(data.literal, _clingo.TruthValue._True if self.__weak else _clingo.TruthValue._False)
+                true = getattr_(_clingo.TruthValue, "_True", "True_", "True")
+                false = getattr_(_clingo.TruthValue, "_False", "False_", "False")
+                ctx.backend.add_external(data.literal, true if self.__weak else false)
                 ctx.add_todo(self, step)
                 data.done = False
         elif not data.done:
