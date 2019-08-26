@@ -79,14 +79,14 @@ class Application:
     Rewrites the incoming temporal logic programs into incremental ASP programs
     and solves them.
     """
-    def __init__(self, name):
+    def __init__(self):
         """
         Initializes the application setting the program name.
 
         See clingo.clingo_main().
         """
-        self.program_name = name
-        self.version = "1.0.1"
+        self.program_name = "telingo"
+        self.version = "1.0.3"
 
         self.__imin = 0
         self.__imax = None
@@ -176,4 +176,4 @@ def main():
     """
     Run the telingo application.
     """
-    _sys.exit(int(_clingo.clingo_main(Application("telingo"), _sys.argv[1:])))
+    _sys.exit(int(_clingo.clingo_main(Application(), _sys.argv[1:])))

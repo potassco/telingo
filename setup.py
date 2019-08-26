@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(
-    version = '1.0',
+    version = '1.0.3',
     name = 'telingo',
     description = 'System to solve temporal logic programs.',
     author = 'Roland Kaminski',
