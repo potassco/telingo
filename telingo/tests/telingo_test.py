@@ -73,7 +73,7 @@ class TestMain(TestCase):
         self.assertEqual(solve('{p(1,a,(1,a),f(2,a),"test",#inf,#sup)}. q(0) :- not &tel {p(1,a,(1,a),f(2,a),"test",#inf,#sup)}.'), [['p(1,a,(1,a),f(2,a),"test",#inf,#sup,0)'], ['q(0,0)']])
         self.assertEqual(solve("{p; q}. :- not &tel {p & q}."), [['p(0)', 'q(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {p | q}."), [[]])
-        self.assertEqual(solve("{p; q}. :- &tel {p <> q}."), [[], ['p(0)', 'q(0)']])
+        self.assertEqual(solve("{p; q}. :- &tel {p <> q}."), [['p(0)'], ['q(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {p -> q}."), [['p(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {p <- q}."), [['q(0)']])
         self.assertEqual(solve("{p; q}. :- &tel {~p | ~q}."), [['p(0)', 'q(0)']])
