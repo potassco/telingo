@@ -315,10 +315,10 @@ class BooleanFormula(BodyFormula):
                     lhs = -lhs
                 make_disjunction(ctx.backend, lit, lhs, rhs)
             elif self.__operator == "<>":
-                ctx.backend.add_rule([], [ lit,  rhs,  lhs])
-                ctx.backend.add_rule([], [ lit, -rhs, -lhs])
-                ctx.backend.add_rule([], [-lit,  rhs, -lhs])
-                ctx.backend.add_rule([], [-lit, -rhs,  lhs])
+                ctx.backend.add_rule([], [-lit,  rhs,  lhs])
+                ctx.backend.add_rule([], [-lit, -rhs, -lhs])
+                ctx.backend.add_rule([], [ lit,  rhs, -lhs])
+                ctx.backend.add_rule([], [ lit, -rhs,  lhs])
 
 # Temporal Formulas {{{1
 
