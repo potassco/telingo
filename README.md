@@ -10,23 +10,9 @@ are grounded and solved is adjusted.
 # Usage
 
 ```
-telingo --help
-telingo examples/del/ex1.lp
+python3 -m telingo --help
+python3 -m telingo  examples/del/ex1.lp
 ```
-
-To use *telingo* directly from source run `python -m telingo` from the
-project's root directory.
-
-# Installation
-
-Either run *telingo* directly from source or install it by the usual means
-provided by Python. We also provide anaconda packages for easy installation of
-all dependencies. You can install telingo via the following command:
-
-```
-conda install -c potassco -c francoislaferriere delingo 
-```
-
 # Syntax
 
 Dynamic formulas are accepted in constraints and behind default
