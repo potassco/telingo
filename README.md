@@ -24,7 +24,7 @@ provided by Python. We also provide anaconda packages for easy installation of
 all dependencies. You can install telingo via the following command:
 
 ```
-conda install -c potassco -c francoislaferriere telingo 
+conda install -c potassco -c francoislaferriere delingo 
 ```
 
 # Syntax
