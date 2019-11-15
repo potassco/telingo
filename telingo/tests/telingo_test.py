@@ -30,6 +30,51 @@ def solve(s, imin=0, dual=False, always=True):
     return sorted(r)
 
 class TestMain(TestCase):
+
+    def test_dynamic(self):
+        self.assertEqual(solve("#program initial. :- not &del{ ?q .>? p}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?q .>* p}."), [[]])
+        self.assertEqual(solve("#program initial. z :- not &del{ ?q .>? p}."), [['z(0)']])
+        self.assertEqual(solve("#program initial. z :- not &del{ ?q .>* p}."), [[]])
+        self.assertEqual(solve("#program initial. z :- not &del{ ?q .>* p}. q."), [['q(0)', 'z(0)']])
+        self.assertEqual(solve("#program initial. :- &del{ ?q .>? p}."), [[]])
+        self.assertEqual(solve("#program initial. :- &del{ ?q .>* p}."), [])
+
+        self.assertEqual(solve("#program initial. :- not &del{ &true .>* p}."), [[]])
+        self.assertEqual(solve("#program initial. :- not &del{ &true .>* p}.q'."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ &true .>* p}.p'."), [['p(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ &true .>? p}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ &true .>? p}.p'."), [['p(1)']])
+
+
+        self.assertEqual(solve("#program initial. :- not &del{ ?p;; ?q .>* s}.p.q."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p;; ?q .>* s}.p."), [['p(0)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p;; ?q .>* s}.p.q.s."), [['p(0)','q(0)','s(0)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p;; ?q .>? s}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p;; ?q .>? s}.p.q.s."), [['p(0)','q(0)','s(0)']])
+        self.assertEqual(solve("#program initial. :- not &del{ &true;; ?q .>? s}.q'.s'."), [['q(1)','s(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ &true + ?q .>* s}.q.s.s'."), [['q(0)','s(0)','s(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p+ ?q .>? s}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p+ ?q .>? s}.p.s."), [['p(0)','s(0)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p+ &true .>? s}.s'."), [['s(1)']])
+
+        self.assertEqual(solve("#program initial. :- not &del{ * &true .>? s}.s'."), [['s(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ * &true .>* s}.s''."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ * &true .>* s}.s'.a''."), [])
+
+        self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}.s."), [["s(0)"]])
+        self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}.s.p.a'."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}.s.p.s'."), [['p(0)','s(0)','s(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p + * &true .>* s}.s.p.s'."), [['p(0)','s(0)','s(1)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p + * &true .>* s}.p.s'."), [])
+
+        self.assertEqual(solve("#program initial. :- not &del{ ?p .>? &true .>* &false }.p.s'."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p .>? &true .>* &false }.p."), [['p(0)']])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p .>? ?q .>? &true }.p."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ ?p .>? ?q .>? &true }.p.q."), [['p(0)','q(0)']])
+
+
     def test_simple(self):
         self.assertEqual(solve("p."), [['p(0)']])
         self.assertEqual(solve("p :- q. {q}."), [[], ['p(0)', 'q(0)']])

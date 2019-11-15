@@ -5,7 +5,7 @@ from setuptools import setup
 setup(
     version = '1.0.3',
     name = 'telingo',
-    description = 'System to solve temporal logic programs.',
+    description = 'System to solve dynamic temporal logic programs.',
     author = 'Roland Kaminski',
     license = 'MIT',
     packages = ['telingo', 'telingo.theory', 'telingo.transformers'],

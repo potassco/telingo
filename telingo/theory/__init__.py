@@ -76,9 +76,14 @@ class Theory:
         prg     -- Control object (with theory atoms).
         """
         for atom in prg.theory_atoms:
-            if atom.term.name == "tel" and len(atom.term.arguments) == 1:
+            if atom.term.name == "del" and len(atom.term.arguments) == 1:
                 step    = atom.term.arguments[0].number
-                formula = _bd.translate_elements(atom.elements, self.add_formula)
+                formula = _bd.translate_elements(atom.elements, self.add_formula, True)
+                formula.add_atom(atom.literal, step)
+                self.add_todo(formula, step)
+            elif atom.term.name == "tel" and len(atom.term.arguments) == 1:
+                step    = atom.term.arguments[0].number
+                formula = _bd.translate_elements(atom.elements, self.add_formula, False)
                 formula.add_atom(atom.literal, step)
                 self.add_todo(formula, step)
             elif atom.term.name == "__tel_head" and len(atom.term.arguments) == 1:
