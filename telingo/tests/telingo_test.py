@@ -62,6 +62,9 @@ class TestMain(TestCase):
         self.assertEqual(solve("#program initial. :- not &del{ * &true .>* s}.s''."), [])
         self.assertEqual(solve("#program initial. :- not &del{ * &true .>* s}.s'.a''."), [])
 
+        self.assertEqual(solve("#program initial. :- not &del{ * (p) .>* s}."), [])
+        self.assertEqual(solve("#program initial. :- not &del{ * (p) .>* s}.s."), [["s(0)"]])
+
         self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}."), [])
         self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}.s."), [["s(0)"]])
         self.assertEqual(solve("#program initial. :- not &del{ * (?p ;; &true) .>* s}.s.p.a'."), [])

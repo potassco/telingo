@@ -680,7 +680,7 @@ class DiamondFormula(DelFormula):
         self.add_atom(ctx.add_formula(BooleanFormula("&", self._path._arg, self._rhs)).translate(ctx, step), step)
         
     def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(BooleanConstant(True),1,False))))
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)),1,False))))
         a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
         b = ctx.add_formula(BooleanFormula("|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg,self))))
         self.add_atom(ctx.add_formula(BooleanFormula("&",a,b)).translate(ctx, step), step)
@@ -712,7 +712,7 @@ class BoxFormula(DelFormula):
         self.add_atom(ctx.add_formula(BooleanFormula("->", self._path._arg, self._rhs)).translate(ctx, step), step)
         
     def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(BooleanConstant(True),1,False))))
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)),1,False))))
         a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
         b = ctx.add_formula(BooleanFormula("&", self._rhs, ctx.add_formula(BoxFormula(self._path._arg,self))))
         self.add_atom(ctx.add_formula(BooleanFormula("&",a,b)).translate(ctx, step), step)
@@ -753,7 +753,10 @@ def create_path(rep, add_formula, check):
     add_formula -- Callback to add resulting formuals.
     """
     if rep.type == _clingo.TheoryTermType.Symbol:
-        return create_atom(rep, add_formula, True)
+        if check:
+            return create_atom(rep, add_formula, True)
+        else:
+            return add_formula(SequencePath(add_formula(CheckPath(create_atom(rep, add_formula, True))) ,add_formula(SkipPath())))
     elif rep.type == _clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in g_path_binary_operators:
@@ -787,6 +790,7 @@ def create_path(rep, add_formula, check):
                     raise RuntimeError("unknown identifier: ".format(rep))
             else:
                 raise RuntimeError("invalid dynamic formula: ".format(rep))
+        #this case is probably impossible 
         else:
             return create_atom(rep, add_formula, True)
     else:
@@ -820,7 +824,7 @@ def create_dynamic_formula(rep, add_formula):
                 if arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
                 elif arg.name == "final":
-                    return add_formula(BoxFormula(SkipPath(),BooleanConstant(False)))
+                    return add_formula(BoxFormula(add_formula(SkipPath()),add_formula(BooleanConstant(False))))
                 else:
                     raise RuntimeError("unknown identifier: ".format(rep))
             else:
