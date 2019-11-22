@@ -819,6 +819,8 @@ def create_dynamic_formula(rep, add_formula):
             if arg.type == _clingo.TheoryTermType.Symbol:
                 if arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
+                elif arg.name == "final":
+                    return add_formula(BoxFormula(SkipPath(),BooleanConstant(False)))
                 else:
                     raise RuntimeError("unknown identifier: ".format(rep))
             else:
