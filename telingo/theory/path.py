@@ -1,4 +1,4 @@
-class Path:
+class Path(object):
     """
     Base class of all path
 
@@ -39,7 +39,7 @@ class ChoicePath(BinaryPath):
     def __init__(self, lhs, rhs):
         BinaryPath.__init__(self, "({}{}{})".format(lhs._rep,"+",rhs._rep), lhs, rhs)
 
-class SequencePath(Path):
+class SequencePath(BinaryPath):
     
     def __init__(self, lhs, rhs):
         BinaryPath.__init__(self, "({}{}{})".format(lhs._rep,";;",rhs._rep), lhs, rhs)
