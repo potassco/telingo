@@ -207,11 +207,11 @@ Dynamic formulas are constructed by the box (always) and diamond (eventually) op
 
 Path expressions are formed with: 
 
-* `\* ` (prefix) Kleene star
-* `? ` (prefix) test
-* `\+ ` (infix) disjunction
-* `;; ` (infix) sequence
-* `&true ` = \top 
+* `*` (prefix) Kleene star
+* `?` (prefix) test
+* `+` (infix)  disjunction
+* `;;`(infix)  sequence
+* `&true` = \top 
 
 **The path expression is required to be in [normal form](https://www.cs.uni-potsdam.de/wv/publications/DBLP_conf/lpnmr/CabalarDS19.pdf).**
 
