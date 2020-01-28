@@ -213,7 +213,7 @@ Path expressions are formed with:
 * `;; ` (infix) sequence
 * `&true ` = \top 
 
-**The path expression is required to be in [normal form](https://www.cs.uni-potsdam.de/wv/publications/DBLP_conf/datalog/CabalarS19.pdf).**
+**The path expression is required to be in [normal form](https://www.cs.uni-potsdam.de/wv/publications/DBLP_conf/lpnmr/CabalarDS19.pdf).**
 
 **Examples:**   
 * `&del{*(?a ;; &true) .>? b} ` for `<(a?;T)*>b`   
