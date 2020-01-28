@@ -193,7 +193,6 @@ Answer: 1
   shoot
 SATISFIABLE
 ```
-`
 
 # Dynamic Logic
 
