@@ -133,9 +133,9 @@ class Atom(BodyFormula):
         """
         rep = "({}{}({}))".format("" if positive else "-", name, ",".join([str(a) for a in arguments]))
         if name.startswith("'"):
-            raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
+            raise RuntimeError("temporal formulas use < instead of leading primes: {}".format(rep))
         if name.endswith("'"):
-            raise RuntimeError("temporal formulas use > instead of trailing primes: ".format(rep))
+            raise RuntimeError("temporal formulas use > instead of trailing primes: {}".format(rep))
         BodyFormula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
@@ -740,7 +740,7 @@ def create_atom(rep, add_formula, positive):
             return create_atom(rep.arguments[0], add_formula, not positive)
         elif rep.name not in g_all_operators:
             return add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
-    raise RuntimeError("invalid atom: ".format(rep))
+    raise RuntimeError("invalid atom: {}".format(rep))
 
 def create_path(rep, add_formula, check):
     """
@@ -761,7 +761,7 @@ def create_path(rep, add_formula, check):
         args = rep.arguments
         if rep.name in g_path_binary_operators:
             if check:
-                raise RuntimeError("invalid dynamic formula: ".format(rep))
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
             lhs = create_path(args[0], add_formula, False)
             rhs = create_path(args[1], add_formula, False)
             if rep.name == "+":
@@ -771,7 +771,7 @@ def create_path(rep, add_formula, check):
                 return add_formula(SequencePath(lhs, rhs))
         elif rep.name in g_path_unary_operators:
             if check:
-                raise RuntimeError("invalid dynamic formula: ".format(rep))
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
             if rep.name == "?":
                 arg = create_path(args[0], add_formula, True)
                 return add_formula(CheckPath(arg))
@@ -787,14 +787,14 @@ def create_path(rep, add_formula, check):
                 if check and arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
                 else:
-                    raise RuntimeError("unknown identifier: ".format(rep))
+                    raise RuntimeError("unknown identifier: {}".format(rep))
             else:
-                raise RuntimeError("invalid dynamic formula: ".format(rep))
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
         #this case is probably impossible 
         else:
             return create_atom(rep, add_formula, True)
     else:
-        raise RuntimeError("invalid dynamic formula: ".format(rep))
+        raise RuntimeError("invalid dynamic formula: {}".format(rep))
 
 def create_dynamic_formula(rep, add_formula):
     """
@@ -826,15 +826,15 @@ def create_dynamic_formula(rep, add_formula):
                 elif arg.name == "final":
                     return add_formula(BoxFormula(add_formula(SkipPath()), add_formula(BooleanConstant(False))))
                 else:
-                    raise RuntimeError("unknown identifier: ".format(rep))
+                    raise RuntimeError("unknown identifier: {}".format(rep))
             else:
-                raise RuntimeError("invalid dynamic formula: ".format(rep))
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
         elif rep.name in g_all_operators:
-            raise RuntimeError("invalid dynamic formula: ".format(rep))
+            raise RuntimeError("invalid dynamic formula: {}".format(rep))
         else:
             return create_atom(rep, add_formula, True)
     else:
-        raise RuntimeError("invalid dynamic formula: ".format(rep))
+        raise RuntimeError("invalid dynamic formula: {}".format(rep))
 
 def create_formula(rep, add_formula):
     """
@@ -899,13 +899,13 @@ def create_formula(rep, add_formula):
                 elif arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
                 else:
-                    raise RuntimeError("unknown identifier: ".format(rep))
+                    raise RuntimeError("unknown identifier: {}".format(rep))
             else:
-                raise RuntimeError("invalid temporal formula: ".format(rep))
+                raise RuntimeError("invalid temporal formula: {}".format(rep))
         else:
             return create_atom(rep, add_formula, True)
     else:
-        raise RuntimeError("invalid temporal formula: ".format(rep))
+        raise RuntimeError("invalid temporal formula: {}".format(rep))
 
 def translate_conjunction(formulas, add_formula):
     """
