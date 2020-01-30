@@ -63,9 +63,9 @@ class UnaryPath(Path):
 class CheckPath(UnaryPath):
     
     def __init__(self, arg):
-        UnaryPath.__init__(self, "({}{})".format(arg._rep,"?"), arg)
+        UnaryPath.__init__(self, "({}?)".format(arg._rep), arg)
 
 class KleeneStarPath(UnaryPath):
 
     def __init__(self, arg):
-        UnaryPath.__init__(self, "({}{})".format(arg._rep,"*"), arg)
+        UnaryPath.__init__(self, "({}*)".format(arg._rep), arg)
