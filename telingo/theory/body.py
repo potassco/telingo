@@ -658,51 +658,51 @@ class DelFormula(BodyFormula):
 
 class DiamondFormula(DelFormula):
     def __init__(self, path, rhs):
-        rep ="({}{}{}{})".format("<",path._rep,">",rhs._rep)
-        DelFormula.__init__(self,rep,"<>",path,rhs)
+        rep ="({}{}{}{})".format("<", path._rep, ">", rhs._rep)
+        DelFormula.__init__(self, rep, "<>", path, rhs)
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
-            attr = "translate_"+self._path.__class__.__name__
+            attr = "translate_" + self._path.__class__.__name__
             data.add_literal(ctx.backend)
             getattr(self, attr)(ctx, step, data)
 
     def translate_ChoicePath(self,ctx, step, data):
         lhs = ctx.add_formula(DiamondFormula(self._path._lhs, self._rhs))
         rhs = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs))
-        self.add_atom(ctx.add_formula(BooleanFormula("|",rhs,lhs)).translate(ctx, step), step)
+        self.add_atom(ctx.add_formula(BooleanFormula("|", rhs, lhs)).translate(ctx, step), step)
 
-    def translate_SequencePath(self,ctx, step, data):
+    def translate_SequencePath(self, ctx, step, data):
         f = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs)) 
         self.add_atom(ctx.add_formula(DiamondFormula(self._path._lhs, f)).translate(ctx, step), step)
         
-    def translate_CheckPath(self,ctx, step, data):
+    def translate_CheckPath(self, ctx, step, data):
         self.add_atom(ctx.add_formula(BooleanFormula("&", self._path._arg, self._rhs)).translate(ctx, step), step)
         
     def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)),1,False))))
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
         a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
-        b = ctx.add_formula(BooleanFormula("|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg,self))))
-        self.add_atom(ctx.add_formula(BooleanFormula("&",a,b)).translate(ctx, step), step)
+        b = ctx.add_formula(BooleanFormula("|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg, self))))
+        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
 
     def translate_SkipPath(self,ctx, step, data):
         self.add_atom(ctx.add_formula(Next(self._rhs, 1, False)).translate(ctx, step), step)
 
 class BoxFormula(DelFormula):
     def __init__(self, path, rhs):
-        rep ="({}{}{}{})".format("[",path._rep,"]",rhs._rep)
-        DelFormula.__init__(self,rep,"[]",path,rhs)
+        rep ="({}{}{}{})".format("[", path._rep,"]", rhs._rep)
+        DelFormula.__init__(self, rep, "[]", path, rhs)
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
-            attr = "translate_"+self._path.__class__.__name__
+            attr = "translate_" + self._path.__class__.__name__
             data.add_literal(ctx.backend)
             getattr(self, attr)(ctx, step, data)
 
     def translate_ChoicePath(self,ctx, step, data):
         lhs = ctx.add_formula(BoxFormula(self._path._lhs, self._rhs))
         rhs = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs))
-        self.add_atom(ctx.add_formula(BooleanFormula("&",rhs,lhs)).translate(ctx, step), step)
+        self.add_atom(ctx.add_formula(BooleanFormula("&", rhs, lhs)).translate(ctx, step), step)
 
     def translate_SequencePath(self,ctx, step, data):
         f = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs)) 
@@ -712,10 +712,10 @@ class BoxFormula(DelFormula):
         self.add_atom(ctx.add_formula(BooleanFormula("->", self._path._arg, self._rhs)).translate(ctx, step), step)
         
     def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)),1,False))))
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
         a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
         b = ctx.add_formula(BooleanFormula("&", self._rhs, ctx.add_formula(BoxFormula(self._path._arg,self))))
-        self.add_atom(ctx.add_formula(BooleanFormula("&",a,b)).translate(ctx, step), step)
+        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
 
     def translate_SkipPath(self,ctx, step, data):
         self.add_atom(ctx.add_formula(Next(self._rhs, 1, True)).translate(ctx, step), step)
@@ -756,28 +756,28 @@ def create_path(rep, add_formula, check):
         if check:
             return create_atom(rep, add_formula, True)
         else:
-            return add_formula(SequencePath(add_formula(CheckPath(create_atom(rep, add_formula, True))) ,add_formula(SkipPath())))
+            return add_formula(SequencePath(add_formula(CheckPath(create_atom(rep, add_formula, True))), add_formula(SkipPath())))
     elif rep.type == _clingo.TheoryTermType.Function:
         args = rep.arguments
         if rep.name in g_path_binary_operators:
             if check:
                 raise RuntimeError("invalid dynamic formula: ".format(rep))
-            lhs = create_path(args[0],add_formula, False)
-            rhs = create_path(args[1],add_formula, False)
+            lhs = create_path(args[0], add_formula, False)
+            rhs = create_path(args[1], add_formula, False)
             if rep.name == "+":
                 return add_formula(ChoicePath(lhs,rhs))
             else:
                 assert(rep.name == ";;")
-                return add_formula(SequencePath(lhs,rhs))
+                return add_formula(SequencePath(lhs, rhs))
         elif rep.name in g_path_unary_operators:
             if check:
                 raise RuntimeError("invalid dynamic formula: ".format(rep))
             if rep.name == "?":
-                arg = create_path(args[0],add_formula, True)
+                arg = create_path(args[0], add_formula, True)
                 return add_formula(CheckPath(arg))
             else:
                 assert(rep.name == "*")
-                arg = create_path(args[0],add_formula, False)
+                arg = create_path(args[0], add_formula, False)
                 return add_formula(KleeneStarPath(arg))
         elif rep.name == "&":
             arg = rep.arguments[0]
@@ -817,14 +817,14 @@ def create_dynamic_formula(rep, add_formula):
                 return add_formula(BoxFormula(lhs,rhs))
             else:
                 assert(rep.name == ".>?")
-                return add_formula(DiamondFormula(lhs,rhs))
+                return add_formula(DiamondFormula(lhs, rhs))
         elif rep.name == "&":
             arg = rep.arguments[0]
             if arg.type == _clingo.TheoryTermType.Symbol:
                 if arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
                 elif arg.name == "final":
-                    return add_formula(BoxFormula(add_formula(SkipPath()),add_formula(BooleanConstant(False))))
+                    return add_formula(BoxFormula(add_formula(SkipPath()), add_formula(BooleanConstant(False))))
                 else:
                     raise RuntimeError("unknown identifier: ".format(rep))
             else:

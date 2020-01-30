@@ -109,7 +109,7 @@ g_path_binary_operators = {";;", "+"}
 Set of all tel, del and path operators.
 
 """
-g_all_operators = g_binary_operators.union(g_unary_operators).union(g_arithmetic_operators).union(g_tel_operators).union(g_del_operators).union(g_path_unary_operators).union(g_path_binary_operators)
+g_all_operators = g_binary_operators.union(g_unary_operators, g_arithmetic_operators, g_tel_operators, g_del_operators, g_path_unary_operators, g_path_binary_operators)
 
 class Formula:
     """
