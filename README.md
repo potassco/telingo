@@ -193,3 +193,27 @@ Answer: 1
   shoot
 SATISFIABLE
 ```
+
+# Dynamic Logic
+
+Dynamic formulas are accepted in constraints and behind default
+negation between the braces of theory atoms of form `&del { ... }`   
+
+Dynamic formulas are constructed by the box (always) and diamond (eventually) operators: 
+
+* `.>*` (infix) for box operator, so that [p] q becomes p .>* q
+* `.>?` (infix) for diamond operator, so that \<p> q becomes p .>?  q
+
+Path expressions are formed with: 
+
+* `*` (prefix) Kleene star
+* `?` (prefix) test
+* `+` (infix)  disjunction
+* `;;`(infix)  sequence
+* `&true` = \top 
+
+**The path expression is required to be in [normal form](https://www.cs.uni-potsdam.de/wv/publications/DBLP_conf/lpnmr/CabalarDS19.pdf).**
+
+**Examples:**   
+* `&del{*(?a ;; &true) .>? b} ` for `<(a?;T)*>b`   
+* `&del{?a + ?b .>* c}` for `[a?+b?]c`

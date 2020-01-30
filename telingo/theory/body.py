@@ -7,6 +7,7 @@ import clingo as _clingo
 from telingo.util import getattr_
 
 from .formula import *
+from .path import *
 
 # Base for Body Formulas {{{1
 
@@ -132,9 +133,9 @@ class Atom(BodyFormula):
         """
         rep = "({}{}({}))".format("" if positive else "-", name, ",".join([str(a) for a in arguments]))
         if name.startswith("'"):
-            raise RuntimeError("temporal formulas use < instead of leading primes: ".format(rep))
+            raise RuntimeError("temporal formulas use < instead of leading primes: {}".format(rep))
         if name.endswith("'"):
-            raise RuntimeError("temporal formulas use > instead of trailing primes: ".format(rep))
+            raise RuntimeError("temporal formulas use > instead of trailing primes: {}".format(rep))
         BodyFormula.__init__(self, rep)
         self.__name      = name
         self.__arguments = arguments
@@ -628,6 +629,97 @@ class TelFormulaN(TelFormula):
             fut = self.__future.translate(ctx, step)
             self._translate(ctx, step, data, fut)
 
+# Dynamic Formulas {{{1
+
+class DelFormula(BodyFormula):
+    """
+    Captures a diamond or box formula.
+
+    Members:
+    _op   -- The id of the operator.
+    _path -- The left-hand-side of the temporal operator.
+    _rhs  -- The right-hand-side of the temporal operator.
+    """
+
+    def __init__(self, rep, op, path, rhs):
+        """
+        Initializes the formula.
+
+        Arguments:
+        rep -- String representation of the formula.
+        op -- The id of the operator.
+        lhs -- The left-hand-side of the operator.
+        rhs -- The right-hand-side of the operator.
+        """
+        self._op   = op
+        self._path = path 
+        self._rhs  = rhs
+        BodyFormula.__init__(self, rep)
+
+class DiamondFormula(DelFormula):
+    def __init__(self, path, rhs):
+        rep ="({}{}{}{})".format("<", path._rep, ">", rhs._rep)
+        DelFormula.__init__(self, rep, "<>", path, rhs)
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            attr = "translate_" + self._path.__class__.__name__
+            data.add_literal(ctx.backend)
+            getattr(self, attr)(ctx, step, data)
+
+    def translate_ChoicePath(self,ctx, step, data):
+        lhs = ctx.add_formula(DiamondFormula(self._path._lhs, self._rhs))
+        rhs = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs))
+        self.add_atom(ctx.add_formula(BooleanFormula("|", rhs, lhs)).translate(ctx, step), step)
+
+    def translate_SequencePath(self, ctx, step, data):
+        f = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs)) 
+        self.add_atom(ctx.add_formula(DiamondFormula(self._path._lhs, f)).translate(ctx, step), step)
+        
+    def translate_CheckPath(self, ctx, step, data):
+        self.add_atom(ctx.add_formula(BooleanFormula("&", self._path._arg, self._rhs)).translate(ctx, step), step)
+        
+    def translate_KleeneStarPath(self,ctx, step, data):
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
+        a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
+        b = ctx.add_formula(BooleanFormula("|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg, self))))
+        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
+
+    def translate_SkipPath(self,ctx, step, data):
+        self.add_atom(ctx.add_formula(Next(self._rhs, 1, False)).translate(ctx, step), step)
+
+class BoxFormula(DelFormula):
+    def __init__(self, path, rhs):
+        rep ="({}{}{}{})".format("[", path._rep,"]", rhs._rep)
+        DelFormula.__init__(self, rep, "[]", path, rhs)
+
+    def do_translate(self, ctx, step, data):
+        if data.literal is None:
+            attr = "translate_" + self._path.__class__.__name__
+            data.add_literal(ctx.backend)
+            getattr(self, attr)(ctx, step, data)
+
+    def translate_ChoicePath(self,ctx, step, data):
+        lhs = ctx.add_formula(BoxFormula(self._path._lhs, self._rhs))
+        rhs = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs))
+        self.add_atom(ctx.add_formula(BooleanFormula("&", rhs, lhs)).translate(ctx, step), step)
+
+    def translate_SequencePath(self,ctx, step, data):
+        f = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs)) 
+        self.add_atom(ctx.add_formula(BoxFormula(self._path._lhs, f)).translate(ctx, step), step)
+        
+    def translate_CheckPath(self,ctx, step, data):
+        self.add_atom(ctx.add_formula(BooleanFormula("->", self._path._arg, self._rhs)).translate(ctx, step), step)
+        
+    def translate_KleeneStarPath(self,ctx, step, data):
+        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
+        a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
+        b = ctx.add_formula(BooleanFormula("&", self._rhs, ctx.add_formula(BoxFormula(self._path._arg,self))))
+        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
+
+    def translate_SkipPath(self,ctx, step, data):
+        self.add_atom(ctx.add_formula(Next(self._rhs, 1, True)).translate(ctx, step), step)
+
 # Theory of Formulas {{{1
 
 def create_atom(rep, add_formula, positive):
@@ -646,9 +738,103 @@ def create_atom(rep, add_formula, positive):
     elif rep.type == _clingo.TheoryTermType.Function:
         if rep.name == "-" and len(rep.arguments) == 1:
             return create_atom(rep.arguments[0], add_formula, not positive)
-        elif rep.name not in g_binary_operators and rep.name not in g_unary_operators and rep.name not in g_tel_operators and rep.name not in g_arithmetic_operators:
+        elif rep.name not in g_all_operators:
             return add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
-    raise RuntimeError("invalid atom: ".format(rep))
+    raise RuntimeError("invalid atom: {}".format(rep))
+
+def create_path(rep, add_formula, check):
+    """
+    Returns the path formula corresponding the given path term.
+
+    Throws an error if rep it is not a valid path formula.
+
+    Arguments:
+    rep         -- Term to translate.
+    add_formula -- Callback to add resulting formuals.
+    """
+    if rep.type == _clingo.TheoryTermType.Symbol:
+        if check:
+            return create_atom(rep, add_formula, True)
+        else:
+            return add_formula(SequencePath(add_formula(CheckPath(create_atom(rep, add_formula, True))), add_formula(SkipPath())))
+    elif rep.type == _clingo.TheoryTermType.Function:
+        args = rep.arguments
+        if rep.name in g_path_binary_operators:
+            if check:
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
+            lhs = create_path(args[0], add_formula, False)
+            rhs = create_path(args[1], add_formula, False)
+            if rep.name == "+":
+                return add_formula(ChoicePath(lhs,rhs))
+            else:
+                assert(rep.name == ";;")
+                return add_formula(SequencePath(lhs, rhs))
+        elif rep.name in g_path_unary_operators:
+            if check:
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
+            if rep.name == "?":
+                arg = create_path(args[0], add_formula, True)
+                return add_formula(CheckPath(arg))
+            else:
+                assert(rep.name == "*")
+                arg = create_path(args[0], add_formula, False)
+                return add_formula(KleeneStarPath(arg))
+        elif rep.name == "&":
+            arg = rep.arguments[0]
+            if arg.type == _clingo.TheoryTermType.Symbol:
+                if not check and arg.name == "true":
+                    return add_formula(SkipPath())
+                if check and arg.name == "true" or arg.name == "false":
+                    return add_formula(BooleanConstant(arg.name == "true"))
+                else:
+                    raise RuntimeError("unknown identifier: {}".format(rep))
+            else:
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
+        #this case is probably impossible 
+        else:
+            return create_atom(rep, add_formula, True)
+    else:
+        raise RuntimeError("invalid dynamic formula: {}".format(rep))
+
+def create_dynamic_formula(rep, add_formula):
+    """
+    Returns the dynamic formula corresponding the given theory term.
+
+    Throws an error if rep it is not a valid formula.
+
+    Arguments:
+    rep         -- Theory term to translate.
+    add_formula -- Callback to add resulting formuals.
+    """
+    if rep.type == _clingo.TheoryTermType.Symbol:
+        return create_atom(rep, add_formula, True)
+    elif rep.type == _clingo.TheoryTermType.Function:
+        args = rep.arguments
+        if rep.name in g_del_operators:
+            lhs = create_path(args[0], add_formula, False)
+            rhs = create_dynamic_formula(args[1], add_formula)
+            if rep.name == ".>*":
+                return add_formula(BoxFormula(lhs,rhs))
+            else:
+                assert(rep.name == ".>?")
+                return add_formula(DiamondFormula(lhs, rhs))
+        elif rep.name == "&":
+            arg = rep.arguments[0]
+            if arg.type == _clingo.TheoryTermType.Symbol:
+                if arg.name == "true" or arg.name == "false":
+                    return add_formula(BooleanConstant(arg.name == "true"))
+                elif arg.name == "final":
+                    return add_formula(BoxFormula(add_formula(SkipPath()), add_formula(BooleanConstant(False))))
+                else:
+                    raise RuntimeError("unknown identifier: {}".format(rep))
+            else:
+                raise RuntimeError("invalid dynamic formula: {}".format(rep))
+        elif rep.name in g_all_operators:
+            raise RuntimeError("invalid dynamic formula: {}".format(rep))
+        else:
+            return create_atom(rep, add_formula, True)
+    else:
+        raise RuntimeError("invalid dynamic formula: {}".format(rep))
 
 def create_formula(rep, add_formula):
     """
@@ -713,13 +899,13 @@ def create_formula(rep, add_formula):
                 elif arg.name == "true" or arg.name == "false":
                     return add_formula(BooleanConstant(arg.name == "true"))
                 else:
-                    raise RuntimeError("unknown identifier: ".format(rep))
+                    raise RuntimeError("unknown identifier: {}".format(rep))
             else:
-                raise RuntimeError("invalid temporal formula: ".format(rep))
+                raise RuntimeError("invalid temporal formula: {}".format(rep))
         else:
             return create_atom(rep, add_formula, True)
     else:
-        raise RuntimeError("invalid temporal formula: ".format(rep))
+        raise RuntimeError("invalid temporal formula: {}".format(rep))
 
 def translate_conjunction(formulas, add_formula):
     """
@@ -740,7 +926,7 @@ def translate_conjunction(formulas, add_formula):
     return formula
 
 
-def translate_elements(elements, add_formula):
+def translate_elements(elements, add_formula, dynamic):
     """
     Translate the given conjunction of elements and return a formula.
 
@@ -755,10 +941,12 @@ def translate_elements(elements, add_formula):
     formulas = []
 
     for element in elements:
-        formulas.append(create_formula(element.terms[0], add_formula))
+        if dynamic:
+            formulas.append(create_dynamic_formula(element.terms[0], add_formula))
+        else:
+            formulas.append(create_formula(element.terms[0], add_formula))
         if len(element.condition) > 0:
             condition = translate_conjunction([add_formula(NumericLiteral(literal)) for literal in element.condition], add_formula)
             formulas[-1] = add_formula(BooleanFormula("->", condition, formulas[-1]))
 
     return translate_conjunction(formulas, add_formula)
-

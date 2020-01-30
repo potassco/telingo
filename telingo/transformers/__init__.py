@@ -215,4 +215,21 @@ def transform(inputs, callback):
             &__tel_head/1 : formula_body, head
         }.
         '''), no_program)
+
+
+    _clingo.parse_program(_dedent('''\
+        #theory del {
+            formula_body  {
+                &   : 7, unary;         % prefix for keywords
+                ?   : 4, unary;         % check
+                *   : 3, unary;         % kleene star
+                +   : 2, binary, left;  % choice
+                ;;  : 1, binary, left;  % sequence
+                .>? : 0, binary, right; % diamond (eventually)
+                .>* : 0, binary, right  % box (always)
+            };
+            &del/1 : formula_body, body
+        }.
+        '''), no_program)
+
     return future_sigs, reground_parts

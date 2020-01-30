@@ -141,7 +141,11 @@ class ProgramTransformer(_tf.Transformer):
         if atom.term.type == _ast.ASTType.Function and len(atom.term.arguments) == 0:
             time = lambda loc: _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
             wrap = lambda loc, atom: _ast.Literal(loc, _ast.Sign.DoubleNegation, atom) if self.__head else atom
-            if atom.term.name == "tel" :
+            if atom.term.name == "del" :
+                if not self.__negation and not self.__constraint:
+                        raise RuntimeError("dynamic formulas not supported in this context: {}".format(_tf.str_location(atom.location)))
+                atom.term.arguments = [_ast.Symbol(atom.term.location, _clingo.Function("__t"))]
+            elif atom.term.name == "tel" :
                 if self.__head:
                     atom, rules = self.__head_transformer.transform(atom)
                     self.__aux_rules.extend(rules)
