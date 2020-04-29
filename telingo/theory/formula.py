@@ -149,7 +149,7 @@ def create_number(rep):
         return rep.number
     # TODO: this case should be handled as in AG
     #       the corresponding formula should evaluate to false
-    raise RuntimeError("number expected: ".format(rep))
+    raise RuntimeError("number expected: {}".format(rep))
 
 def create_symbol(rep):
     """
