@@ -8,8 +8,9 @@ from telingo.util import getattr_
 
 from .formula import *
 from .path import *
-
+from ..util import observer
 # Base for Body Formulas {{{1
+
 
 class StepData:
     """
@@ -23,16 +24,17 @@ class StepData:
                 representative literal.
     done     -- Whether translation of the theory atom is done.
     """
+
     def __init__(self):
         """
         Initialize the step information.
         """
-        self.literal  = None
+        self.literal = None
         self.literals = set()
-        self.todo     = []
-        self.done     = True
+        self.todo = []
+        self.done = True
 
-    def add_literal(self, backend):
+    def add_literal(self, backend, rep):
         """
         Set the representative of the literal.
 
@@ -49,6 +51,7 @@ class StepData:
             self.literals.remove(self.literal)
         else:
             self.literal = backend.add_atom()
+            observer.prg_map[self.literal] = rep
             backend.add_rule([self.literal], [], True)
         return self.literal
 
@@ -61,11 +64,12 @@ class BodyFormula(Formula):
     __rep  -- unique string representation of the formula
     __data -- map from time points to StepData objects
     """
+
     def __init__(self, rep):
         """
         Initializes a formula with the given string representation.
         """
-        self.__rep  = rep
+        self.__rep = rep
         self.__data = {}
 
     @property
@@ -113,6 +117,7 @@ class BodyFormula(Formula):
 
 # Boolean Formulas {{{1
 
+
 class Atom(BodyFormula):
     """
     An atomic formula.
@@ -122,6 +127,7 @@ class Atom(BodyFormula):
     __arguments -- Arguments of the atom (list of symbols).
     __positive  -- Classical negation sign.
     """
+
     def __init__(self, name, arguments=[], positive=True):
         """
         Initializes the atom.
@@ -131,15 +137,18 @@ class Atom(BodyFormula):
         arguments -- Arguments of the atom.
         positive  -- Classical negation sign.
         """
-        rep = "({}{}({}))".format("" if positive else "-", name, ",".join([str(a) for a in arguments]))
+        rep = "({}{}({}))".format("" if positive else "-",
+                                  name, ",".join([str(a) for a in arguments]))
         if name.startswith("'"):
-            raise RuntimeError("temporal formulas use < instead of leading primes: {}".format(rep))
+            raise RuntimeError(
+                "temporal formulas use < instead of leading primes: {}".format(rep))
         if name.endswith("'"):
-            raise RuntimeError("temporal formulas use > instead of trailing primes: {}".format(rep))
+            raise RuntimeError(
+                "temporal formulas use > instead of trailing primes: {}".format(rep))
         BodyFormula.__init__(self, rep)
-        self.__name      = name
+        self.__name = name
         self.__arguments = arguments
-        self.__positive  = positive
+        self.__positive = positive
 
     def do_translate(self, ctx, step, data):
         """
@@ -158,9 +167,11 @@ class Atom(BodyFormula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            sym = _clingo.Function(self.__name, self.__arguments + [step], self.__positive)
+            sym = _clingo.Function(
+                self.__name, self.__arguments + [step], self.__positive)
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
+
 
 class NumericLiteral(BodyFormula):
     """
@@ -169,6 +180,7 @@ class NumericLiteral(BodyFormula):
     Members:
     __literal -- The numeric literal.
     """
+
     def __init__(self, literal):
         """
         Initializes the literal.
@@ -203,6 +215,7 @@ class BooleanConstant(BodyFormula):
     Members:
     __value -- Truth value of the formula.
     """
+
     def __init__(self, value):
         """
         Initializes the formula with the given value.
@@ -231,6 +244,7 @@ class BooleanConstant(BodyFormula):
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -ctx.false_literal if self.__value else ctx.false_literal
 
+
 class Negation(BodyFormula):
     """
     Formula capturing (default) negation.
@@ -238,6 +252,7 @@ class Negation(BodyFormula):
     Members:
     __arg -- Formula to negate.
     """
+
     def __init__(self, arg):
         """
         Initializes the formula with the formula to negate.
@@ -262,6 +277,7 @@ class Negation(BodyFormula):
             assert(step in range(0, ctx.horizon + 1))
             data.literal = -self.__arg.translate(ctx, step)
 
+
 class BooleanFormula(BodyFormula):
     """
     Formula capturing binary Boolean formulas.
@@ -284,8 +300,8 @@ class BooleanFormula(BodyFormula):
         rep = "({}{}{})".format(lhs._rep, operator, rhs._rep)
         BodyFormula.__init__(self, rep)
         self.__operator = operator
-        self.__lhs      = lhs
-        self.__rhs      = rhs
+        self.__lhs = lhs
+        self.__rhs = rhs
 
     def do_translate(self, ctx, step, data):
         """
@@ -306,7 +322,7 @@ class BooleanFormula(BodyFormula):
             assert(step in range(0, ctx.horizon + 1))
             lhs = self.__lhs.translate(ctx, step)
             rhs = self.__rhs.translate(ctx, step)
-            lit = data.add_literal(ctx.backend)
+            lit = data.add_literal(ctx.backend, self._rep)
             if self.__operator != "<>":
                 if self.__operator == "&":
                     lit, lhs, rhs = -lit, -lhs, -rhs
@@ -318,10 +334,11 @@ class BooleanFormula(BodyFormula):
             elif self.__operator == "<>":
                 ctx.backend.add_rule([], [-lit,  rhs,  lhs])
                 ctx.backend.add_rule([], [-lit, -rhs, -lhs])
-                ctx.backend.add_rule([], [ lit,  rhs, -lhs])
-                ctx.backend.add_rule([], [ lit, -rhs,  lhs])
+                ctx.backend.add_rule([], [lit,  rhs, -lhs])
+                ctx.backend.add_rule([], [lit, -rhs,  lhs])
 
 # Temporal Formulas {{{1
+
 
 class Previous(BodyFormula):
     """
@@ -332,6 +349,7 @@ class Previous(BodyFormula):
     __weak -- Whether this is a weak previous operator.
     __n    -- How many steps to look back.
     """
+
     def __init__(self, arg, n, weak):
         """
         Initializes the formula.
@@ -342,8 +360,9 @@ class Previous(BodyFormula):
         n    -- How many steps to look back.
         """
         assert(n > 0)
-        BodyFormula.__init__(self, "({}{}{})".format(n, "<:" if weak else "<", arg._rep))
-        self.__arg  = arg
+        BodyFormula.__init__(self, "({}{}{})".format(
+            n, "<:" if weak else "<", arg._rep))
+        self.__arg = arg
         self.__weak = weak
         self.__n = n
 
@@ -373,6 +392,7 @@ class Previous(BodyFormula):
                 if self.__weak and step < self.__n:
                     data.literal = -data.literal
 
+
 class Initially(BodyFormula):
     """
     Captures a formula referring to the initial situation.
@@ -380,6 +400,7 @@ class Initially(BodyFormula):
     Members:
     __arg  -- The argument of the previous operator.
     """
+
     def __init__(self, arg):
         """
         Initializes the formula.
@@ -388,7 +409,7 @@ class Initially(BodyFormula):
         arg  -- The argument of the initial operator.
         """
         BodyFormula.__init__(self, "(<<{})".format(arg._rep))
-        self.__arg  = arg
+        self.__arg = arg
 
     def do_translate(self, ctx, step, data):
         """
@@ -407,6 +428,7 @@ class Initially(BodyFormula):
         if data.literal is None:
             data.literal = self.__arg.translate(ctx, 0)
 
+
 class Next(BodyFormula):
     """
     Captures a formula referring to the next state.
@@ -416,6 +438,7 @@ class Next(BodyFormula):
     __weak -- Whether this is a weak next operator.
     __n    -- How many steps to look ahead.
     """
+
     def __init__(self, arg, n, weak):
         """
         Initializes the formula.
@@ -425,11 +448,12 @@ class Next(BodyFormula):
         weak -- Whether this is a weak next operator.
         n    -- How many steps to look ahead.
         """
-        BodyFormula.__init__(self, "({}{}{})".format(n, ">:" if weak else ">", arg._rep))
+        BodyFormula.__init__(self, "({}{}{})".format(
+            n, ">:" if weak else ">", arg._rep))
         assert(n > 0)
-        self.__arg  = arg
+        self.__arg = arg
         self.__weak = weak
-        self.__n    = n
+        self.__n = n
 
     def do_translate(self, ctx, step, data):
         """
@@ -459,8 +483,10 @@ class Next(BodyFormula):
             else:
                 data.literal = ctx.backend.add_atom()
                 true = getattr_(_clingo.TruthValue, "_True", "True_", "True")
-                false = getattr_(_clingo.TruthValue, "_False", "False_", "False")
-                ctx.backend.add_external(data.literal, true if self.__weak else false)
+                false = getattr_(_clingo.TruthValue,
+                                 "_False", "False_", "False")
+                ctx.backend.add_external(
+                    data.literal, true if self.__weak else false)
                 ctx.add_todo(self, step)
                 data.done = False
         elif not data.done:
@@ -472,6 +498,7 @@ class Next(BodyFormula):
                 data.done = True
             else:
                 ctx.add_todo(self, step)
+
 
 class TelFormula(BodyFormula):
     """
@@ -501,7 +528,7 @@ class TelFormula(BodyFormula):
         rhs -- The right-hand-side of the operator.
         """
         BodyFormula.__init__(self, rep)
-        self._op  = op
+        self._op = op
         self._lhs = lhs
         self._rhs = rhs
 
@@ -523,7 +550,7 @@ class TelFormula(BodyFormula):
         """
         lhs = None if self._lhs is None else self._lhs.translate(ctx, step)
         rhs = self._rhs.translate(ctx, step)
-        lit = data.add_literal(ctx.backend)
+        lit = data.add_literal(ctx.backend, self._rep)
         if self._op == "<*" or self._op == ">*":
             lit, rhs, pre = -lit, -rhs, -pre
             if lhs is not None:
@@ -544,6 +571,7 @@ class TelFormulaP(TelFormula):
     The left-hand-side of the operator can be None in which case either an
     eventually or an always operator is represented.
     """
+
     def __init__(self, op, lhs, rhs):
         """
         Initializes the formula.
@@ -577,6 +605,7 @@ class TelFormulaP(TelFormula):
                 pre = self.translate(ctx, step - 1)
                 self._translate(ctx, step, data, pre)
 
+
 class TelFormulaN(TelFormula):
     """
     Captures a release or until formulas.
@@ -587,6 +616,7 @@ class TelFormulaN(TelFormula):
     Members:
     __future -- Next formula referring to the future to ease the translation.
     """
+
     def __init__(self, op, lhs, rhs):
         """
         Initializes the formula.
@@ -631,6 +661,7 @@ class TelFormulaN(TelFormula):
 
 # Dynamic Formulas {{{1
 
+
 class DelFormula(BodyFormula):
     """
     Captures a diamond or box formula.
@@ -651,76 +682,93 @@ class DelFormula(BodyFormula):
         lhs -- The left-hand-side of the operator.
         rhs -- The right-hand-side of the operator.
         """
-        self._op   = op
-        self._path = path 
-        self._rhs  = rhs
+        self._op = op
+        self._path = path
+        self._rhs = rhs
         BodyFormula.__init__(self, rep)
+
 
 class DiamondFormula(DelFormula):
     def __init__(self, path, rhs):
-        rep ="({}{}{}{})".format("<", path._rep, ">", rhs._rep)
+        rep = "({}{}{}{})".format("<", path._rep, ">", rhs._rep)
         DelFormula.__init__(self, rep, "<>", path, rhs)
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
             attr = "translate_" + self._path.__class__.__name__
-            data.add_literal(ctx.backend)
+            data.add_literal(ctx.backend, self._rep)
             getattr(self, attr)(ctx, step, data)
 
-    def translate_ChoicePath(self,ctx, step, data):
+    def translate_ChoicePath(self, ctx, step, data):
         lhs = ctx.add_formula(DiamondFormula(self._path._lhs, self._rhs))
         rhs = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs))
-        self.add_atom(ctx.add_formula(BooleanFormula("|", rhs, lhs)).translate(ctx, step), step)
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "|", rhs, lhs)).translate(ctx, step), step)
 
     def translate_SequencePath(self, ctx, step, data):
-        f = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs)) 
-        self.add_atom(ctx.add_formula(DiamondFormula(self._path._lhs, f)).translate(ctx, step), step)
-        
-    def translate_CheckPath(self, ctx, step, data):
-        self.add_atom(ctx.add_formula(BooleanFormula("&", self._path._arg, self._rhs)).translate(ctx, step), step)
-        
-    def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
-        a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
-        b = ctx.add_formula(BooleanFormula("|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg, self))))
-        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
+        f = ctx.add_formula(DiamondFormula(self._path._rhs, self._rhs))
+        self.add_atom(ctx.add_formula(DiamondFormula(
+            self._path._lhs, f)).translate(ctx, step), step)
 
-    def translate_SkipPath(self,ctx, step, data):
-        self.add_atom(ctx.add_formula(Next(self._rhs, 1, False)).translate(ctx, step), step)
+    def translate_CheckPath(self, ctx, step, data):
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "&", self._path._arg, self._rhs)).translate(ctx, step), step)
+
+    def translate_KleeneStarPath(self, ctx, step, data):
+        final = ctx.add_formula(Negation(ctx.add_formula(
+            Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
+        a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
+        b = ctx.add_formula(BooleanFormula(
+            "|", self._rhs, ctx.add_formula(DiamondFormula(self._path._arg, self))))
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "&", a, b)).translate(ctx, step), step)
+
+    def translate_SkipPath(self, ctx, step, data):
+        self.add_atom(ctx.add_formula(
+            Next(self._rhs, 1, False)).translate(ctx, step), step)
+
 
 class BoxFormula(DelFormula):
     def __init__(self, path, rhs):
-        rep ="({}{}{}{})".format("[", path._rep,"]", rhs._rep)
+        rep = "({}{}{}{})".format("[", path._rep, "]", rhs._rep)
         DelFormula.__init__(self, rep, "[]", path, rhs)
 
     def do_translate(self, ctx, step, data):
         if data.literal is None:
             attr = "translate_" + self._path.__class__.__name__
-            data.add_literal(ctx.backend)
+            data.add_literal(ctx.backend, self._rep)
             getattr(self, attr)(ctx, step, data)
 
-    def translate_ChoicePath(self,ctx, step, data):
+    def translate_ChoicePath(self, ctx, step, data):
         lhs = ctx.add_formula(BoxFormula(self._path._lhs, self._rhs))
         rhs = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs))
-        self.add_atom(ctx.add_formula(BooleanFormula("&", rhs, lhs)).translate(ctx, step), step)
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "&", rhs, lhs)).translate(ctx, step), step)
 
-    def translate_SequencePath(self,ctx, step, data):
-        f = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs)) 
-        self.add_atom(ctx.add_formula(BoxFormula(self._path._lhs, f)).translate(ctx, step), step)
-        
-    def translate_CheckPath(self,ctx, step, data):
-        self.add_atom(ctx.add_formula(BooleanFormula("->", self._path._arg, self._rhs)).translate(ctx, step), step)
-        
-    def translate_KleeneStarPath(self,ctx, step, data):
-        final =  ctx.add_formula(Negation(ctx.add_formula(Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
+    def translate_SequencePath(self, ctx, step, data):
+        f = ctx.add_formula(BoxFormula(self._path._rhs, self._rhs))
+        self.add_atom(ctx.add_formula(BoxFormula(
+            self._path._lhs, f)).translate(ctx, step), step)
+
+    def translate_CheckPath(self, ctx, step, data):
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "->", self._path._arg, self._rhs)).translate(ctx, step), step)
+
+    def translate_KleeneStarPath(self, ctx, step, data):
+        final = ctx.add_formula(Negation(ctx.add_formula(
+            Next(ctx.add_formula(BooleanConstant(True)), 1, False))))
         a = ctx.add_formula(BooleanFormula("->", final, self._rhs))
-        b = ctx.add_formula(BooleanFormula("&", self._rhs, ctx.add_formula(BoxFormula(self._path._arg,self))))
-        self.add_atom(ctx.add_formula(BooleanFormula("&", a, b)).translate(ctx, step), step)
+        b = ctx.add_formula(BooleanFormula(
+            "&", self._rhs, ctx.add_formula(BoxFormula(self._path._arg, self))))
+        self.add_atom(ctx.add_formula(BooleanFormula(
+            "&", a, b)).translate(ctx, step), step)
 
-    def translate_SkipPath(self,ctx, step, data):
-        self.add_atom(ctx.add_formula(Next(self._rhs, 1, True)).translate(ctx, step), step)
+    def translate_SkipPath(self, ctx, step, data):
+        self.add_atom(ctx.add_formula(
+            Next(self._rhs, 1, True)).translate(ctx, step), step)
 
 # Theory of Formulas {{{1
+
 
 def create_atom(rep, add_formula, positive):
     """
@@ -741,6 +789,7 @@ def create_atom(rep, add_formula, positive):
         elif rep.name not in g_all_operators:
             return add_formula(Atom(rep.name, [create_symbol(arg) for arg in rep.arguments], positive))
     raise RuntimeError("invalid atom: {}".format(rep))
+
 
 def create_path(rep, add_formula, check):
     """
@@ -765,7 +814,7 @@ def create_path(rep, add_formula, check):
             lhs = create_path(args[0], add_formula, False)
             rhs = create_path(args[1], add_formula, False)
             if rep.name == "+":
-                return add_formula(ChoicePath(lhs,rhs))
+                return add_formula(ChoicePath(lhs, rhs))
             else:
                 assert(rep.name == ";;")
                 return add_formula(SequencePath(lhs, rhs))
@@ -790,11 +839,12 @@ def create_path(rep, add_formula, check):
                     raise RuntimeError("unknown identifier: {}".format(rep))
             else:
                 raise RuntimeError("invalid dynamic formula: {}".format(rep))
-        #this case is probably impossible 
+        # this case is probably impossible
         else:
             return create_atom(rep, add_formula, True)
     else:
         raise RuntimeError("invalid dynamic formula: {}".format(rep))
+
 
 def create_dynamic_formula(rep, add_formula):
     """
@@ -814,7 +864,7 @@ def create_dynamic_formula(rep, add_formula):
             lhs = create_path(args[0], add_formula, False)
             rhs = create_dynamic_formula(args[1], add_formula)
             if rep.name == ".>*":
-                return add_formula(BoxFormula(lhs,rhs))
+                return add_formula(BoxFormula(lhs, rhs))
             else:
                 assert(rep.name == ".>?")
                 return add_formula(DiamondFormula(lhs, rhs))
@@ -835,6 +885,7 @@ def create_dynamic_formula(rep, add_formula):
             return create_atom(rep, add_formula, True)
     else:
         raise RuntimeError("invalid dynamic formula: {}".format(rep))
+
 
 def create_formula(rep, add_formula):
     """
@@ -865,7 +916,8 @@ def create_formula(rep, add_formula):
             elif rep.name == ">" or rep.name == ">:":
                 lhs = 1 if len(args) == 1 else create_number(args[0])
                 return rhs if lhs == 0 else add_formula(Next(rhs, lhs, rep.name == ">:"))
-            lhs = None if len(args) == 1 else create_formula(args[0], add_formula)
+            lhs = None if len(args) == 1 else create_formula(
+                args[0], add_formula)
             if rep.name == "<;" or rep.name == "<:;":
                 return add_formula(BooleanFormula("&", Previous(lhs, 1, rep.name == "<:;"), rhs))
             elif rep.name == "<*":
@@ -886,7 +938,8 @@ def create_formula(rep, add_formula):
                 return formula
             else:
                 assert(rep.name == ">>")
-                rhs = add_formula(BooleanFormula("|", add_formula(Negation(add_formula(Atom("__final", [], True)))), rhs))
+                rhs = add_formula(BooleanFormula("|", add_formula(
+                    Negation(add_formula(Atom("__final", [], True)))), rhs))
                 formula = add_formula(TelFormulaN(">*", None, rhs))
                 formula.set_future(add_formula(Next(formula, 1, True)))
                 return formula
@@ -906,6 +959,7 @@ def create_formula(rep, add_formula):
             return create_atom(rep, add_formula, True)
     else:
         raise RuntimeError("invalid temporal formula: {}".format(rep))
+
 
 def translate_conjunction(formulas, add_formula):
     """
@@ -942,11 +996,14 @@ def translate_elements(elements, add_formula, dynamic):
 
     for element in elements:
         if dynamic:
-            formulas.append(create_dynamic_formula(element.terms[0], add_formula))
+            formulas.append(create_dynamic_formula(
+                element.terms[0], add_formula))
         else:
             formulas.append(create_formula(element.terms[0], add_formula))
         if len(element.condition) > 0:
-            condition = translate_conjunction([add_formula(NumericLiteral(literal)) for literal in element.condition], add_formula)
-            formulas[-1] = add_formula(BooleanFormula("->", condition, formulas[-1]))
+            condition = translate_conjunction([add_formula(NumericLiteral(
+                literal)) for literal in element.condition], add_formula)
+            formulas[-1] = add_formula(BooleanFormula("->",
+                                                      condition, formulas[-1]))
 
     return translate_conjunction(formulas, add_formula)

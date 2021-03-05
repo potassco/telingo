@@ -16,8 +16,10 @@ from . import theory as _ty
 import sys as _sys
 import clingo as _clingo
 import textwrap as _textwrap
+from .util import observer
 
-def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
+
+def imain(prg, future_sigs, program_parts, on_model, imin=0, imax=None, istop="SAT", out_file=None):
     """
     Take a program object and runs the incremental main solving loop.
 
@@ -43,34 +45,52 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imin          -- Minimum number of iterations.
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
+    out_file      -- Path for file where to save the final program.
     """
     f = _ty.Theory()
     step, ret = 0, None
+    if out_file is not None:
+        prg.register_observer(observer)
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (
-              (istop == "SAT"     and not ret.satisfiable) or
-              (istop == "UNSAT"   and not ret.unsatisfiable) or
-              (istop == "UNKNOWN" and not ret.unknown)))):
+               (istop == "SAT" and not ret.satisfiable) or
+               (istop == "UNSAT" and not ret.unsatisfiable) or
+               (istop == "UNKNOWN" and not ret.unknown)))):
         parts = []
         for root_name, part_name, rng in program_parts:
             for i in rng:
                 if ((step - i >= 0 and root_name == "always") or
-                    (step - i  > 0 and root_name == "dynamic") or
-                    (step - i == 0 and root_name == "initial")):
+                    (step - i > 0 and root_name == "dynamic") or
+                        (step - i == 0 and root_name == "initial")):
                     parts.append((part_name, [step - i, step]))
         if step > 0:
             prg.release_external(_clingo.Function("__final", [step-1]))
             prg.cleanup()
 
         prg.ground(parts)
+
         f.translate(step, prg)
+
         prg.assign_external(_clingo.Function("__final", [step]), True)
         assumptions = []
+        if out_file is not None:
+            observer.assumeed_lit = []
         for name, arity, positive in future_sigs:
             for atom in prg.symbolic_atoms.by_signature(name, arity, positive):
                 if atom.symbol.arguments[-1].number > step:
                     assumptions.append(-atom.literal)
-        ret, step = prg.solve(on_model=lambda m: on_model(m, step), assumptions=assumptions), step+1
+        if out_file is not None:
+            observer.prg_update(prg)
+        ret, step = prg.solve(on_model=lambda m: on_model(
+            m, step), assumptions=assumptions), step+1
+    # Save progra on last step
+    if not out_file is None:
+        clingo_prg = observer.get_clingo_program(
+            getattr(f, '_Theory__false_literal'))
+        f = open(out_file, 'w')
+        f.write("% {} (Setp {}) \n{}".format(ret, step, clingo_prg))
+        f.close()
+
 
 class Application:
     """
@@ -79,6 +99,7 @@ class Application:
     Rewrites the incoming temporal logic programs into incremental ASP programs
     and solves them.
     """
+
     def __init__(self):
         """
         Initializes the application setting the program name.
@@ -132,7 +153,8 @@ class Application:
         table = {}
         for sym in model.symbols(shown=True):
             if sym.type == _clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1].number, []).append(_clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
+                table.setdefault(sym.arguments[-1].number, []).append(
+                    _clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
         for step in range(self.__horizon+1):
             symbols = table.get(step, [])
             _sys.stdout.write(" State {}:".format(step))
@@ -151,8 +173,10 @@ class Application:
         See clingo.clingo_main().
         """
         group = "Telingo Options"
-        options.add(group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
-        options.add(group, "imax", "Maximum number of solving steps []", self.__parse_imax, argument="<n>")
+        options.add(
+            group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
+        options.add(group, "imax", "Maximum number of solving steps []",
+                    self.__parse_imax, argument="<n>")
         options.add(group, "istop", _textwrap.dedent("""\
             Stop criterion [sat]
                   <arg>: {sat|unsat|unknown}"""), self.__parse_istop)
@@ -168,9 +192,12 @@ class Application:
             files = [open(f) for f in files]
             if len(files) == 0:
                 files.append(_sys.stdin)
-            future_sigs, program_parts = _tf.transform([f.read() for f in files], b.add)
+            future_sigs, program_parts = _tf.transform(
+                [f.read() for f in files], b.add)
 
-        imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
+        imain(prg, future_sigs, program_parts, self.__on_model,
+              self.__imin, self.__imax, self.__istop)
+
 
 def main():
     """
