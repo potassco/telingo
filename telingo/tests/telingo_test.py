@@ -41,6 +41,10 @@ class TestMain(TestCase):
     def test_example(self):
         solve(
             "#program initial. :- not &del{ * &true .>? s}.s'.", imin=2, out_file="./out_test.lp")
+        # solve(
+        # "#program initial. :- not &del{ * &true .>? s}.s'.a:-b.b.", imin = 2, out_file = "./out_test.lp")
+        # solve(
+        #     "a:-b. b. #program initial. :- not &del{ * &true .>? s}.s'.", imin=4, out_file="./out_test.lp")
         # "#program initial. :- not &del{ * &true .>* s}.s'.s.s''.s'''.", imin=4, out_file="./out_test.lp")
         # "#program initial. :- not &del{ * &true .>* s}.s'.s.s''.s'''.", imin=4, out_file="./out_test.lp")
 
@@ -227,9 +231,9 @@ class TestMain(TestCase):
         models = solve("""\
             s.
             {q;p}.
-            #program final.
+            # program final.
             :- not &tel { < s }.
-            #program initial.
+            # program initial.
             :- not q.
             :- not q', not p'.
             :- not q', not q.
@@ -315,15 +319,15 @@ class TestMain(TestCase):
 
     def test_eventually(self):
         s = '''
-        #program initial.
+        # program initial.
         aux.
-        #program dynamic.
+        # program dynamic.
         aux :- 'aux, not 'q.
-        #program always.
+        # program always.
         p.
         q :- aux, not &tel{ > >? q }.
-        #show p/0.
-        #show q/0.
+        # show p/0.
+        # show q/0.
         '''
         self.assertEqual(solve(s, imin=3), [
             ['p(0)', 'p(1)', 'p(2)', 'q(0)'],

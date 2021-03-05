@@ -3,6 +3,7 @@
 % *******************  RULES
 __future_s(1,1).
 __initial(0).
+{l_4}. % Choice for theory added manually
 :- not l_4.
 {l_7}.
 :- not l_7.

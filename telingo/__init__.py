@@ -16,7 +16,7 @@ from . import theory as _ty
 import sys as _sys
 import clingo as _clingo
 import textwrap as _textwrap
-from .util import observer
+from .program_observer import observer
 
 
 def imain(prg, future_sigs, program_parts, on_model, imin=0, imax=None, istop="SAT", out_file=None):

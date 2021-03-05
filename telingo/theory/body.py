@@ -8,7 +8,7 @@ from telingo.util import getattr_
 
 from .formula import *
 from .path import *
-from ..util import observer
+from ..program_observer import observer
 # Base for Body Formulas {{{1
 
 
