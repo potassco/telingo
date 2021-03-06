@@ -81,8 +81,9 @@ def imain(prg, future_sigs, program_parts, on_model, imin=0, imax=None, istop="S
                     assumptions.append(-atom.literal)
         if out_file is not None:
             observer.prg_update(prg)
-        ret, step = prg.solve(on_model=lambda m: on_model(
-            m, step), assumptions=assumptions), step+1
+        # ret = prg.solve(on_model=lambda m: on_model(
+            # m, step), assumptions=assumptions)
+        step = step+1
     # Save progra on last step
     if not out_file is None:
         clingo_prg = observer.get_clingo_program(

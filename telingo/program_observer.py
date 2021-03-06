@@ -1,8 +1,11 @@
 """
 This module contains simple helper functions.
 """
-
+import sys
 import clingo
+import telingo
+import telingo.transformers as transformers
+from telingo.tests.telingo_test import solve
 
 
 class Observer:
@@ -43,13 +46,6 @@ class Observer:
                 self.externals[k] = "#false"
         self.prg_map.update(self.externals)
         self.prg_map[false_literal] = "#false"
-        # Add choice for theory
-        # theory = [(k, v) for k, v in self.prg_map.items() if str(v)[0] == '&']
-        # if len(theory) == 0:
-        #     print("No theory atoms")
-        # else:
-        #     for t in theory:
-        #         prg += "{}{}{}.".format('{', self.get_prop(t[0]), '}')
 
         lit_with_added_choice = []
         for rule in self.rules:
@@ -63,13 +59,14 @@ class Observer:
                     p = self.get_prop(l)
                     if p == "#false":
                         false_body = True
-                    elif p != "#true":
+                    if p != "#true":
                         body_lits.append(p)
                 else:
                     p = self.get_prop(-l)
                     if p == "#true":
                         false_body = True
-                    elif p != "#false":
+
+                    if p != "#false":
                         body_lits.append("not " + p)
 
                     # Add choice for theory in :- not &t
@@ -77,11 +74,13 @@ class Observer:
                         prg += "{}{}{}. % Choice for theory added manually\n".format(
                             '{', self.get_prop(-l), '}')
                         lit_with_added_choice.append(-l)
-
+            is_choice_on_prop = rule[0] and len(
+                rule[1]) == 1 and head[:2] != "l_"
+            if is_choice_on_prop or false_body:
+                prg += "%"
             impl = ":- "if len(rule[2]) != 0 else ""
-            if not false_body:
-                prg += "{}{}{}{}{}.\n".format(bracket_l,
-                                              head, bracket_r, impl, ", ".join(body_lits))
+            prg += "{}{}{}{}{}.\n".format(bracket_l,
+                                          head, bracket_r, impl, ", ".join(body_lits))
         for l in self.assumeed_lit:
             if l > 0:
                 prg += "{}.".format(self.get_prop(l))
@@ -135,7 +134,7 @@ class Observer:
         Parameters
         ----------
         literals : List[int]
-            The program literals to assume (positive literals are true and
+            The program literals to assume (positive literals are true andz 
             negative literals false for the next solve call).
 
         Returns
@@ -147,3 +146,13 @@ class Observer:
 
 global observer
 observer = Observer()
+
+if __name__ == "__main__":
+    program = ""
+    for fn in sys.argv[3:]:
+        f = open(fn, 'r')
+        program += f.read()
+        f.close()
+    solve(program, int(
+        sys.argv[1]), out_file=sys.argv[2], imax=int(
+        sys.argv[1]))

@@ -24,15 +24,14 @@ def parse_model(m, s, dual):
     return list(map(str, sorted(ret)))
 
 
-def solve(s, imin=0, dual=False, always=True, out_file=None):
+def solve(s, imin=0, dual=False, always=True, out_file=None, istop="SAT", imax=20):
     r = []
-    imax = 20
     prg = clingo.Control(['0'], message_limit=0)
     with prg.builder() as b:
         future_sigs, reground_parts = transformers.transform(
             [("#program always. " if always else "") + s], b.add)
     telingo.imain(prg, future_sigs, reground_parts, lambda m,
-                  s: r.append(parse_model(m, s, dual)), imax=20, imin=imin, out_file=out_file)
+                  s: r.append(parse_model(m, s, dual)), imax=imax, imin=imin, out_file=out_file, istop=istop)
     return sorted(r)
 
 
