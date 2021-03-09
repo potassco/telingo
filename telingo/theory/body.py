@@ -55,6 +55,15 @@ class StepData:
             backend.add_rule([self.literal], [], True)
         return self.literal
 
+    def append_literal(self, literal):
+        # self.literals.add(literal)
+        # if self.literal is None:
+        #     self.literal = min(self.literals)
+        self.literal = literal
+
+    def __str__(self):
+        return "** : Literal {} Literals {} **".format(self.literal, self.literals)
+
 
 class BodyFormula(Formula):
     """
@@ -94,7 +103,10 @@ class BodyFormula(Formula):
         step -- Step at which to translate.
         """
         data = self.__data.setdefault(step, StepData())
+        # print("------------- \n Transtaling STEP:{} {} \n------------\n".format(step, self._rep))
         self.do_translate(ctx, step, data)
+        # print("\nDATA {}\n{}\n{}".format(
+        # step, str(data), {k: str(d) for k, d in self.__data.items()}))
         if len(data.todo) > 0:
             for atom in data.todo:
                 make_equal(ctx.backend, atom, data.literal)
@@ -170,7 +182,9 @@ class Atom(BodyFormula):
             sym = _clingo.Function(
                 self.__name, self.__arguments + [step], self.__positive)
             sym_atom = ctx.symbols[sym]
-            data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
+            # Changed
+            data.append_literal(
+                sym_atom.literal if sym_atom is not None else ctx.false_literal)
 
 
 class NumericLiteral(BodyFormula):
@@ -205,7 +219,8 @@ class NumericLiteral(BodyFormula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            data.literal = self.__literal
+            # Changed
+            data.append_literal(self.__literal)
 
 
 class BooleanConstant(BodyFormula):
@@ -242,7 +257,8 @@ class BooleanConstant(BodyFormula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            data.literal = -ctx.false_literal if self.__value else ctx.false_literal
+            # Changed
+            data.append_literal(-ctx.false_literal if self.__value else ctx.false_literal)
 
 
 class Negation(BodyFormula):
@@ -275,7 +291,8 @@ class Negation(BodyFormula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            data.literal = -self.__arg.translate(ctx, step)
+            # Changed
+            data.append_literal(-self.__arg.translate(ctx, step))
 
 
 class BooleanFormula(BodyFormula):
@@ -386,11 +403,14 @@ class Previous(BodyFormula):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step >= self.__n:
-                data.literal = self.__arg.translate(ctx, step - self.__n)
+                # Changed
+                data.append_literal(self.__arg.translate(ctx, step - self.__n))
             else:
-                data.literal = ctx.false_literal
+                # Changed
+                data.append_literal(ctx.false_literal)
                 if self.__weak and step < self.__n:
-                    data.literal = -data.literal
+                    # Changed
+                    data.append_literal(-data.literal)
 
 
 class Initially(BodyFormula):
@@ -426,7 +446,8 @@ class Initially(BodyFormula):
         data -- Step data associated with the step.
         """
         if data.literal is None:
-            data.literal = self.__arg.translate(ctx, 0)
+            # Changed
+            data.append_literal(self.__arg.translate(ctx, 0))
 
 
 class Next(BodyFormula):
@@ -478,15 +499,18 @@ class Next(BodyFormula):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step + self.__n <= ctx.horizon:
-                data.literal = self.__arg.translate(ctx, step + self.__n)
+                # Changed
+                data.append_literal(self.__arg.translate(ctx, step + self.__n))
                 data.done = True
             else:
-                data.literal = ctx.backend.add_atom()
+                # Changed
+                b_atom = ctx.backend.add_atom()
+                data.append_literal(b_atom)
                 true = getattr_(_clingo.TruthValue, "_True", "True_", "True")
                 false = getattr_(_clingo.TruthValue,
                                  "_False", "False_", "False")
                 ctx.backend.add_external(
-                    data.literal, true if self.__weak else false)
+                    b_atom, true if self.__weak else false)
                 ctx.add_todo(self, step)
                 data.done = False
         elif not data.done:
@@ -494,7 +518,8 @@ class Next(BodyFormula):
             if step + self.__n <= ctx.horizon:
                 arg = self.__arg.translate(ctx, step + self.__n)
                 make_equal(ctx.backend, data.literal, arg)
-                ctx.backend.add_external(data.literal, _clingo.TruthValue.Free)
+                ctx.backend.add_external(
+                    data.literal, _clingo.TruthValue.Free)
                 data.done = True
             else:
                 ctx.add_todo(self, step)
@@ -548,6 +573,7 @@ class TelFormula(BodyFormula):
         data -- Step data associated with the step.
         pre  -- The literal obtained from the inductive step.
         """
+
         lhs = None if self._lhs is None else self._lhs.translate(ctx, step)
         rhs = self._rhs.translate(ctx, step)
         lit = data.add_literal(ctx.backend, self._rep)
@@ -600,7 +626,8 @@ class TelFormulaP(TelFormula):
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
             if step == 0:
-                data.literal = self._rhs.translate(ctx, step)
+                # Changed
+                data.append_literal(self._rhs.translate(ctx, step))
             else:
                 pre = self.translate(ctx, step - 1)
                 self._translate(ctx, step, data, pre)

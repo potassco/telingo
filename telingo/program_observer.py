@@ -36,13 +36,13 @@ class Observer:
     def get_clingo_program(self, false_literal=None):
         prg = "\n% *******************  RULES\n"
         for k, v in self.externals.items():
-            if v.__class__ == clingo.TruthValue:
-                self.externals[k] = "#true"
+            if "free" in str(v).lower():
+                self.externals[k] = "free"
+            elif "release" in str(v).lower():
+                self.externals[k] = "release"
             elif "true" in str(v).lower():
                 self.externals[k] = "#true"
             elif "false" in str(v).lower():
-                self.externals[k] = "#false"
-            elif "free" in str(v).lower():
                 self.externals[k] = "#false"
         self.prg_map.update(self.externals)
         self.prg_map[false_literal] = "#false"
@@ -59,15 +59,15 @@ class Observer:
                     p = self.get_prop(l)
                     if p == "#false":
                         false_body = True
-                    if p != "#true":
-                        body_lits.append(p)
+                    # if p != "#true":
+                    body_lits.append(p)
                 else:
                     p = self.get_prop(-l)
                     if p == "#true":
                         false_body = True
 
-                    if p != "#false":
-                        body_lits.append("not " + p)
+                    # if p != "#false":
+                    body_lits.append("not " + p)
 
                     # Add choice for theory in :- not &t
                     if self.prg_map[-l][0] == "&" and not -l in lit_with_added_choice:
@@ -86,7 +86,7 @@ class Observer:
                 prg += "{}.".format(self.get_prop(l))
             elif l < 0:
                 prg += ":- {}.".format(self.get_prop(-1*l))
-        prg += "% *******************\n"
+        prg += "% ******************* AUX LITERALS\n"
         prg += self.get_map()
         return prg
 
@@ -153,6 +153,5 @@ if __name__ == "__main__":
         f = open(fn, 'r')
         program += f.read()
         f.close()
-    solve(program, int(
-        sys.argv[1]), out_file=sys.argv[2], imax=int(
-        sys.argv[1]))
+    solve(program, imin=3, out_file=sys.argv[2], imax=int(
+        sys.argv[1]), istop="UNKNOWN")
