@@ -10,17 +10,22 @@ from . import body as _bd
 from .formula import *
 import itertools as _it
 import functools as _ft
+from clingo import ast as _ast
+
+
+
 
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
     ret.child_keys = keys
-    ret.type = name
+    ret.ast_type = name
     if tostring is not None:
         ret.__str__ = tostring
     ret._rep = property(ret.__str__, "get string representation of tuple")
     return ret
 
-class FormulaToStr(_tf.Transformer):
+
+class FormulaToStr(_ast.Transformer):
     """
     Converts head formuals to string.
     """
@@ -39,7 +44,7 @@ class FormulaToStr(_tf.Transformer):
         return "({}{}{})".format(lhs, op, self(x.rhs))
 
     def visit_TelClause(self, x):
-        if len(x.elements) == 1:
+        if len(x) == 1:
             return self(x.elements[0])
         op = "&" if x.conjunctive else "|"
         return "({})".format(op.join(map(self, x.elements)))
@@ -59,6 +64,7 @@ class FormulaToStr(_tf.Transformer):
             return "(~(~({}>{}))".format(x.lhs, x.rhs)
 
 def formula_to_str(x):
+    # return str(x)
     return FormulaToStr()(x)
 
 TelNext = new_tuple("TelNext", ["lhs", "rhs", "weak"], ["rhs"], formula_to_str)
@@ -69,6 +75,17 @@ TelNegation = new_tuple("TelNegation", ["rhs"], ["rhs"], formula_to_str)
 TelConstant = new_tuple("TelConstant", ["value"], [], formula_to_str)
 TelShift = new_tuple("TelShift", ["lhs", "rhs"], [], formula_to_str)
 
+# class TelClause(new_tuple("TelClause", ["elements", "conjunctive"], [], formula_to_str)):
+#     def __init__(self, elements, conjuctive):
+#         self.conjunctive= conjunctive
+#         if isinstance(elements, _ast.ASTSequence):
+#             self.elements = elements
+#         else:
+#             self.elements = _ast.ASTSequence(self._rep,self.elements)
+#     # @property
+#     # def elements(self):
+#     #     return _ast.ASTSequence(self._rep,self.elements)
+    
 def create_atom(rep, add_formula, positive):
     """
     Returns the atom corresponding the given theory term.
@@ -147,7 +164,7 @@ def create_formula(rep, add_formula):
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
 
-class ShiftFormula(_tf.Transformer):
+class ShiftFormula(_ast.Transformer):
     """
     Shifts the given formula.
     """
@@ -170,7 +187,8 @@ class ShiftFormula(_tf.Transformer):
         return shift_formula(TelClause([x.rhs, inner], not x.until), self.__shift)
 
     def visit_TelClause(self, x):
-        return TelClause(self(x.elements), x.conjunctive)
+        seq = _ast.ASTSequence(x._rep, x.elements)
+        return TelClause(self.visit_sequence(seq), x.conjunctive)
 
     def visit_TelNegation(self, x):
         return TelShift(-self.__shift, x)
@@ -181,7 +199,7 @@ class ShiftFormula(_tf.Transformer):
 def shift_formula(x, shift):
     return ShiftFormula(shift)(x)
 
-class UnfoldFormula(_tf.Transformer):
+class UnfoldFormula(_ast.Transformer):
     """
     Unfolds the given formula into normal rules.
     """
@@ -199,7 +217,7 @@ class UnfoldFormula(_tf.Transformer):
 def unfold_formula(x):
     return UnfoldFormula()(x)
 
-class HeadFormulaToBodyFormula(_tf.Transformer):
+class HeadFormulaToBodyFormula(_ast.Transformer):
     def __init__(self, add_formula):
         self.__add_formula = add_formula
 
@@ -228,7 +246,7 @@ class HeadFormulaToBodyFormula(_tf.Transformer):
 def head_formula_to_body_formula(x, add_formula):
     return HeadFormulaToBodyFormula(add_formula)(x)
 
-class ClauseToRule(_tf.Transformer):
+class ClauseToRule(_ast.Transformer):
     def __init__(self, head, body):
         self.__head = head
         self.__body = body

@@ -57,14 +57,13 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
                 if ((step - i >= 0 and root_name == "always") or
                     (step - i  > 0 and root_name == "dynamic") or
                     (step - i == 0 and root_name == "initial")):
-                    parts.append((part_name, [step - i, step]))
+                    parts.append((part_name, [_clingo.Number(step - i), _clingo.Number(step)]))
         if step > 0:
-            prg.release_external(_clingo.Function("__final", [step-1]))
+            prg.release_external(_clingo.Function("__final", [_clingo.Number(step-1)]))
             prg.cleanup()
-
         prg.ground(parts)
         f.translate(step, prg)
-        prg.assign_external(_clingo.Function("__final", [step]), True)
+        prg.assign_external(_clingo.Function("__final", [_clingo.Number(step)]), True)
         assumptions = []
         for name, arity, positive in future_sigs:
             for atom in prg.symbolic_atoms.by_signature(name, arity, positive):

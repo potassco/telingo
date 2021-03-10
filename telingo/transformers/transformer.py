@@ -32,21 +32,21 @@ def str_location(loc):
     This function takes a location from a clingo AST and transforms it into a
     readable format.
     """
-    begin = loc["begin"]
-    end   = loc["end"]
-    ret = "{}:{}:{}".format(begin["filename"], begin["line"], begin["column"])
+    begin = loc.begin
+    end   = loc.end
+    ret = "{}:{}:{}".format(begin.filename, begin.line, begin.column)
     dash = True
-    eq = begin["filename"] == end["filename"]
+    eq = begin.filename == end.filename
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["filename"])
+        ret += "{}{}".format("-" if dash else ":", end.filename)
         dash = False
-    eq = eq and begin["line"] == end["line"]
+    eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["line"])
+        ret += "{}{}".format("-" if dash else ":", end.line)
         dash = False
-    eq = eq and begin["column"] == end["column"]
+    eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["column"])
+        ret += "{}{}".format("-" if dash else ":", end.column)
         dash = False
     return ret
 
@@ -57,18 +57,18 @@ def is_constraint(s):
     As a special case this function also considers rules with a negative
     literal in the head as a constraint.
     """
-    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Literal and
-            ((s.head.atom.type == _ast.ASTType.BooleanConstant and not s.head.atom.value) or
+    return (s.ast_type == _ast.ASTType.Rule and s.head.ast_type == _ast.ASTType.Literal and
+            ((s.head.atom.ast_type == _ast.ASTType.BooleanConstant and not s.head.atom.value) or
              (s.head.sign != _ast.Sign.NoSign)))
 
 def is_normal(s):
     """
     Check if the given statement is a normal rule.
     """
-    return (s.type == _ast.ASTType.Rule and
-            s.head.type == _ast.ASTType.Literal and
+    return (s.ast_type == _ast.ASTType.Rule and
+            s.head.ast_type == _ast.ASTType.Literal and
             s.head.sign == _ast.Sign.NoSign and
-            s.head.atom.type == _ast.ASTType.SymbolicAtom)
+            s.head.atom.ast_type == _ast.ASTType.SymbolicAtom)
 
 def is_disjunction(s):
     """
@@ -76,59 +76,69 @@ def is_disjunction(s):
 
     Normal rules and constraints are not conisdered disjunctions.
     """
-    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Disjunction)
+    return (s.ast_type == _ast.ASTType.Rule and s.head.ast_type == _ast.ASTType.Disjunction)
 
-class Transformer:
-    """
-    Basic visitor to traverse and modify an AST.
+# class Transformer:
+#     """
+#     Basic visitor to traverse and modify an AST.
 
-    Transformers to modify an AST should subclass this class and add visit_TYPE
-    methods where TYPE corresponds to an ASTType. This function is called
-    whenever a node of the respective type is visited. Its return value will
-    replace the node in the parent.
+#     Transformers to modify an AST should subclass this class and add visit_TYPE
+#     methods where TYPE corresponds to an ASTType. This function is called
+#     whenever a node of the respective type is visited. Its return value will
+#     replace the node in the parent.
 
-    Function visit should be called on the root of the AST to be visited. It is
-    the users responsibility to visit children of nodes that have node-specific
-    visitor.
-    """
-    def visit_children(self, x, *args, **kwargs):
-        """
-        Visits and transforms the children of the given node.
-        """
-        for key in x.child_keys:
-            setattr(x, key, self.visit(getattr(x, key), *args, **kwargs))
-        return x
+#     Function visit should be called on the root of the AST to be visited. It is
+#     the users responsibility to visit children of nodes that have node-specific
+#     visitor.
+#     """
+#     def visit_children(self, x, *args, **kwargs):
+#         """
+#         Visits and transforms the children of the given node.
+#         """
+#         for key in x.child_keys:
+#             setattr(x, key, self.visit(getattr(x, key), *args, **kwargs))
+#         return x
 
-    def visit(self, x, *args, **kwargs):
-        """
-        Visits the given node and returns its transformation.
+#     def visit(self, x, *args, **kwargs):
+#         """
+#         Visits the given node and returns its transformation.
 
-        If there is a matching visit_TYPE function where TYPE corresponds to
-        the ASTType of the given node then this function called and its value
-        returned. Otherwise, its children are visited and transformed.
+#         If there is a matching visit_TYPE function where TYPE corresponds to
+#         the ASTType of the given node then this function called and its value
+#         returned. Otherwise, its children are visited and transformed.
 
-        This function accepts additional positional and keyword arguments,
-        which are passed to node-specific visit functions and to the visit
-        function called for child nodes.
-        """
-        if hasattr(x, "type"):
-            attr = "visit_" + str(x.type)
-            if hasattr(self, attr):
-                return getattr(self, attr)(x, *args, **kwargs)
-            else:
-                return self.visit_children(x, *args, **kwargs)
-        elif isinstance(x, list):
-            return [self.visit(y, *args, **kwargs) for y in x]
-        elif x is None:
-            return x
-        else:
-            raise TypeError("unexpected type")
+#         This function accepts additional positional and keyword arguments,
+#         which are passed to node-specific visit functions and to the visit
+#         function called for child nodes.
+#         """
+#         if hasattr(x, "ast_type"):
+#             attr = "visit_" + str(x.ast_type)
+#             if hasattr(self, attr):
+#                 return getattr(self, attr)(x, *args, **kwargs)
+#             else:
+#                 return self.visit_children(x, *args, **kwargs)
+#         elif isinstance(x, list):
+#             return [self.visit(y, *args, **kwargs) for y in x]
+#         elif isinstance(x, _ast.ASTSequence):
+#             iter_obj = iter(x)
+#             while True:
+#                 try:
+#                     print(next(iter_obj))
+#                     print("Got next")
+#                 except StopIteration:
+#                     print("stop")
+#                     break
+#             raise TypeError("seq")
+#         elif x is None:
+#             return x
+#         else:
+#             raise TypeError("unexpected type")
 
-    def __call__(self, x, *args, **kwargs):
-        """
-        Alternative way to call visit.
-        """
-        return self.visit(x, *args, **kwargs)
+#     def __call__(self, x, *args, **kwargs):
+#         """
+#         Alternative way to call visit.
+#         """
+#         return self.visit(x, *args, **kwargs)
 
 _version = _clingo.__version__.split(".")
 if int(_version[0]) >= 5 and int(_version[1]) >= 4:
