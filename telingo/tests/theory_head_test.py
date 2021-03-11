@@ -39,7 +39,7 @@ class TestTheoryHead(TestCase):
         self.assertEqual(theory_atoms("&tel { >>a }."), ['(>*((~__final)|a))@0'])
         self.assertEqual(theory_atoms("&tel { a>?b }."), ['(a>?b)@0'])
         self.assertEqual(theory_atoms("&tel { a>*b }."), ['(a>*b)@0'])
-        # self.assertEqual(theory_atoms("&tel { -a }."), ['-a@0'])
+        self.assertEqual(theory_atoms("&tel { -a }."), ['-a@0'])
         self.assertEqual(theory_atoms("&tel { ~a }."), ['(~a)@0'])
         self.assertEqual(theory_atoms("&tel { a&b }."), ['(a&b)@0'])
         self.assertEqual(theory_atoms("&tel { a|b }."), ['(a|b)@0'])

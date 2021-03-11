@@ -14,18 +14,18 @@ from clingo import ast as _ast
 
 
 
-
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
     ret.child_keys = keys
     ret.ast_type = name
+    ret.keys = fields
     if tostring is not None:
         ret.__str__ = tostring
     ret._rep = property(ret.__str__, "get string representation of tuple")
     return ret
 
 
-class FormulaToStr(_ast.Transformer):
+class FormulaToStr(_tf.TelTransformer):
     """
     Converts head formuals to string.
     """
@@ -75,16 +75,6 @@ TelNegation = new_tuple("TelNegation", ["rhs"], ["rhs"], formula_to_str)
 TelConstant = new_tuple("TelConstant", ["value"], [], formula_to_str)
 TelShift = new_tuple("TelShift", ["lhs", "rhs"], [], formula_to_str)
 
-# class TelClause(new_tuple("TelClause", ["elements", "conjunctive"], [], formula_to_str)):
-#     def __init__(self, elements, conjuctive):
-#         self.conjunctive= conjunctive
-#         if isinstance(elements, _ast.ASTSequence):
-#             self.elements = elements
-#         else:
-#             self.elements = _ast.ASTSequence(self._rep,self.elements)
-#     # @property
-#     # def elements(self):
-#     #     return _ast.ASTSequence(self._rep,self.elements)
     
 def create_atom(rep, add_formula, positive):
     """
@@ -164,7 +154,7 @@ def create_formula(rep, add_formula):
     else:
         raise RuntimeError("invalid temporal formula: ".format(rep))
 
-class ShiftFormula(_ast.Transformer):
+class ShiftFormula(_tf.TelTransformer):
     """
     Shifts the given formula.
     """
@@ -187,8 +177,7 @@ class ShiftFormula(_ast.Transformer):
         return shift_formula(TelClause([x.rhs, inner], not x.until), self.__shift)
 
     def visit_TelClause(self, x):
-        seq = _ast.ASTSequence(x._rep, x.elements)
-        return TelClause(self.visit_sequence(seq), x.conjunctive)
+        return TelClause(self(x.elements), x.conjunctive)
 
     def visit_TelNegation(self, x):
         return TelShift(-self.__shift, x)
@@ -199,7 +188,7 @@ class ShiftFormula(_ast.Transformer):
 def shift_formula(x, shift):
     return ShiftFormula(shift)(x)
 
-class UnfoldFormula(_ast.Transformer):
+class UnfoldFormula(_tf.TelTransformer):
     """
     Unfolds the given formula into normal rules.
     """
@@ -217,7 +206,7 @@ class UnfoldFormula(_ast.Transformer):
 def unfold_formula(x):
     return UnfoldFormula()(x)
 
-class HeadFormulaToBodyFormula(_ast.Transformer):
+class HeadFormulaToBodyFormula(_tf.TelTransformer):
     def __init__(self, add_formula):
         self.__add_formula = add_formula
 
@@ -246,13 +235,13 @@ class HeadFormulaToBodyFormula(_ast.Transformer):
 def head_formula_to_body_formula(x, add_formula):
     return HeadFormulaToBodyFormula(add_formula)(x)
 
-class ClauseToRule(_ast.Transformer):
+class ClauseToRule(_tf.TelTransformer):
     def __init__(self, head, body):
         self.__head = head
         self.__body = body
 
     def visit_TelAtom(self, x, ctx, step):
-        sym  = _clingo.Function(x.name, x.arguments + [step], x.positive)
+        sym  = _clingo.Function(x.name, x.arguments + [_clingo.Number(step)], x.positive)
         atom = ctx.symbols[sym]
         if atom is not None:
             self.__head.append(atom.literal)

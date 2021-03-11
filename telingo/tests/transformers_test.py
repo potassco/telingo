@@ -59,7 +59,6 @@ class TestTermTransformer(TestCase):
 
     def test_pool(self):
         self.assertEqual(transform_term("p'(1;2,3)"), ("p(1,(__t+1);2,3,(__t+1))", set(), 1))
-        # self.assertEqual(transform_term("p'(1;2,3)"), ("(p(1,(__t+1));p(2,3,(__t+1)))", set(), 1))
 
 def parse_rule(r):
     ret = []

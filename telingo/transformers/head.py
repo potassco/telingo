@@ -513,7 +513,7 @@ def get_variables(x):
     """
     v = {}
     VariablesVisitor(v)(x)
-    return [str(val) for _, val in sorted(v.items(), key=lambda x: x[0])]
+    return [_ast.Variable(x.location, str(val)) for _, val in sorted(v.items(), key=lambda x: x[0])]
 
 # {{{1 transform_head
 

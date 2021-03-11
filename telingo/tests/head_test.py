@@ -83,7 +83,7 @@ class TestHead(TestCase):
         self.assertNotIn((1,4), th.IntervalSet([(1,2),(3,4)]))
 
     def test_variables(self):
-        self.assertEqual(str(th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))), "['X', 'Y', 'Z']")
+        self.assertEqual([str(v) for v in th.get_variables(parse_atom("p(X,Y) | a(X,Z)"))], ['X', 'Y', 'Z'])
 
     def test_transform(self):
         self.assertEqual(transform("a"), ('__aux_0(__t)',

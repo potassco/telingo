@@ -78,67 +78,62 @@ def is_disjunction(s):
     """
     return (s.ast_type == _ast.ASTType.Rule and s.head.ast_type == _ast.ASTType.Disjunction)
 
-# class Transformer:
-#     """
-#     Basic visitor to traverse and modify an AST.
+class TelTransformer:
+    """
+    Basic visitor to traverse and modify an AST.
 
-#     Transformers to modify an AST should subclass this class and add visit_TYPE
-#     methods where TYPE corresponds to an ASTType. This function is called
-#     whenever a node of the respective type is visited. Its return value will
-#     replace the node in the parent.
+    Transformers to modify an AST should subclass this class and add visit_TYPE
+    methods where TYPE corresponds to an ASTType. This function is called
+    whenever a node of the respective type is visited. Its return value will
+    replace the node in the parent.
 
-#     Function visit should be called on the root of the AST to be visited. It is
-#     the users responsibility to visit children of nodes that have node-specific
-#     visitor.
-#     """
-#     def visit_children(self, x, *args, **kwargs):
-#         """
-#         Visits and transforms the children of the given node.
-#         """
-#         for key in x.child_keys:
-#             setattr(x, key, self.visit(getattr(x, key), *args, **kwargs))
-#         return x
+    Function visit should be called on the root of the AST to be visited. It is
+    the users responsibility to visit children of nodes that have node-specific
+    visitor.
+    """
+    def visit_children(self, x, *args, **kwargs):
+        """
+        Visits and transforms the children of the given node.
+        """
+        updated = []
+        for key in x.keys:
+            if key in x.child_keys:
+                value = self.visit(getattr(x, key), *args, **kwargs)
+                updated.append(value)
+            else:
+                updated.append(getattr(x, key))
+        return x.__class__(*updated)
 
-#     def visit(self, x, *args, **kwargs):
-#         """
-#         Visits the given node and returns its transformation.
+    def visit(self, x, *args, **kwargs):
+        """
+        Visits the given node and returns its transformation.
 
-#         If there is a matching visit_TYPE function where TYPE corresponds to
-#         the ASTType of the given node then this function called and its value
-#         returned. Otherwise, its children are visited and transformed.
+        If there is a matching visit_TYPE function where TYPE corresponds to
+        the ASTType of the given node then this function called and its value
+        returned. Otherwise, its children are visited and transformed.
 
-#         This function accepts additional positional and keyword arguments,
-#         which are passed to node-specific visit functions and to the visit
-#         function called for child nodes.
-#         """
-#         if hasattr(x, "ast_type"):
-#             attr = "visit_" + str(x.ast_type)
-#             if hasattr(self, attr):
-#                 return getattr(self, attr)(x, *args, **kwargs)
-#             else:
-#                 return self.visit_children(x, *args, **kwargs)
-#         elif isinstance(x, list):
-#             return [self.visit(y, *args, **kwargs) for y in x]
-#         elif isinstance(x, _ast.ASTSequence):
-#             iter_obj = iter(x)
-#             while True:
-#                 try:
-#                     print(next(iter_obj))
-#                     print("Got next")
-#                 except StopIteration:
-#                     print("stop")
-#                     break
-#             raise TypeError("seq")
-#         elif x is None:
-#             return x
-#         else:
-#             raise TypeError("unexpected type")
+        This function accepts additional positional and keyword arguments,
+        which are passed to node-specific visit functions and to the visit
+        function called for child nodes.
+        """
+        if hasattr(x, "ast_type"):
+            attr = "visit_" + str(x.ast_type)
+            if hasattr(self, attr):
+                return getattr(self, attr)(x, *args, **kwargs)
+            else:
+                return self.visit_children(x, *args, **kwargs)
+        elif isinstance(x, list):
+            return [self.visit(y, *args, **kwargs) for y in x]
+        elif x is None:
+            return x
+        else:
+            raise TypeError("unexpected type")
 
-#     def __call__(self, x, *args, **kwargs):
-#         """
-#         Alternative way to call visit.
-#         """
-#         return self.visit(x, *args, **kwargs)
+    def __call__(self, x, *args, **kwargs):
+        """
+        Alternative way to call visit.
+        """
+        return self.visit(x, *args, **kwargs)
 
 _version = _clingo.__version__.split(".")
 if int(_version[0]) >= 5 and int(_version[1]) >= 4:
