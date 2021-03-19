@@ -13,7 +13,6 @@ import functools as _ft
 from clingo import ast as _ast
 
 
-
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
     ret.child_keys = keys
@@ -44,7 +43,7 @@ class FormulaToStr(_tf.TelTransformer):
         return "({}{}{})".format(lhs, op, self(x.rhs))
 
     def visit_TelClause(self, x):
-        if len(x) == 1:
+        if len(x.elements) == 1:
             return self(x.elements[0])
         op = "&" if x.conjunctive else "|"
         return "({})".format(op.join(map(self, x.elements)))
@@ -64,7 +63,6 @@ class FormulaToStr(_tf.TelTransformer):
             return "(~(~({}>{}))".format(x.lhs, x.rhs)
 
 def formula_to_str(x):
-    # return str(x)
     return FormulaToStr()(x)
 
 TelNext = new_tuple("TelNext", ["lhs", "rhs", "weak"], ["rhs"], formula_to_str)
@@ -75,7 +73,7 @@ TelNegation = new_tuple("TelNegation", ["rhs"], ["rhs"], formula_to_str)
 TelConstant = new_tuple("TelConstant", ["value"], [], formula_to_str)
 TelShift = new_tuple("TelShift", ["lhs", "rhs"], [], formula_to_str)
 
-    
+
 def create_atom(rep, add_formula, positive):
     """
     Returns the atom corresponding the given theory term.

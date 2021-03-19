@@ -8,12 +8,6 @@ from telingo import transformers as tf
 from telingo.theory import head as hd
 from clingo.ast import ProgramBuilder
 
-class TestCase(unittest.TestCase):
-    def assertRaisesRegex(self, *args, **kwargs):
-        return (self.assertRaisesRegexp(*args, **kwargs)
-            if sys.version_info[0] < 3
-            else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
-
 def create_formula(atom):
     clause = []
     for x in atom.elements:
@@ -32,7 +26,7 @@ def theory_atoms(s):
     ret.sort()
     return ret
 
-class TestTheoryHead(TestCase):
+class TestTheoryHead(unittest.TestCase):
     def test_transform(self):
         self.assertEqual(theory_atoms("&tel { >a }."), ['(1>a)@0'])
         self.assertEqual(theory_atoms("&tel { > >a }."), ['(1>(1>a))@0'])

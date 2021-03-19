@@ -86,7 +86,7 @@ def transform(inputs, callback):
     inputs   -- The list of inputs.
     callback -- Callback for rewritten statements.
     """
-    loc = _ast.Location(_ast.Position('<transform>',1,1), _ast.Position('<transform>',1,1))
+    loc = _ast.Location(_ast.Position('<transform>', 1, 1), _ast.Position('<transform>', 1, 1))
     future_predicates = set()
     constraint_parts  = {}
     time              = _ast.SymbolicTerm(loc, _clingo.Function(_tf.g_time_parameter_name))

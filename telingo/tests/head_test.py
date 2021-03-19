@@ -5,12 +5,6 @@ import telingo
 from numbers import Number
 from telingo.transformers import head as th
 
-class TestCase(unittest.TestCase):
-    def assertRaisesRegex(self, *args, **kwargs):
-        return (self.assertRaisesRegexp(*args, **kwargs)
-            if sys.version_info[0] < 3
-            else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
-
 def parse_formula(s):
     ret = []
     clingo.ast.parse_string("&tel{{{}}}.".format(s), ret.append)
@@ -31,7 +25,7 @@ def transform(s):
     atom, rules = th.HeadTransformer().transform(parse_formula(s))
     return (str(atom), [str(rule).replace(". [false]", ".") for rule in rules])
 
-class TestHead(TestCase):
+class TestHead(unittest.TestCase):
     def test_atom(self):
         self.assertEqual(theory_term_to_atom("a(1+2)"), "a(3,__t)")
         self.assertEqual(theory_term_to_atom("a(1+a)"), "a((1+a),__t)")

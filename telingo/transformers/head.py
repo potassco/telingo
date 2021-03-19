@@ -161,8 +161,6 @@ class TheoryParser:
         else:
             a = self.__stack.pop()
             loc = _ast.Location(a.location.begin, b.location.end)
-
-            # l = {"begin": a.location["begin"], "end": b.location["end"]}
             self.__stack.append(_ast.TheoryFunction(loc, operator, [a, b]))
 
     def parse(self, x):
@@ -513,7 +511,7 @@ def get_variables(x):
     """
     v = {}
     VariablesVisitor(v)(x)
-    return [_ast.Variable(x.location, str(val)) for _, val in sorted(v.items(), key=lambda x: x[0])]
+    return [val for _, val in sorted(v.items(), key=lambda x: x[0])]
 
 # {{{1 transform_head
 

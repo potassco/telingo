@@ -7,12 +7,6 @@ from telingo.transformers import transformer as _tf
 from telingo.transformers import term as _tt
 from telingo.transformers import program as _prg
 
-class TestCase(unittest.TestCase):
-    def assertRaisesRegex(self, *args, **kwargs):
-        return (self.assertRaisesRegexp(*args, **kwargs)
-            if sys.version_info[0] < 3
-            else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
-
 def parse_term(t):
     ret = [None]
     def extract_term(s):
@@ -27,7 +21,7 @@ def transform_term(s, replace_future=False, fail_future=False, fail_past=False):
     t = _tt.TermTransformer(a)
     return str(t.visit(parse_term(s), replace_future, fail_future, fail_past, m)), a, m[0]
 
-class TestTermTransformer(TestCase):
+class TestTermTransformer(unittest.TestCase):
     def test_keep_future(self):
         self.assertEqual(transform_term("p"), ("p(__t)", set(), 0))
         self.assertEqual(transform_term("p'p"), ("p'p(__t)", set(), 0))
@@ -77,7 +71,7 @@ def transform_program(p):
     clingo.ast.parse_string(p, lambda s: append(t.visit(s)))
     return (ret, a, {key: [(str(r), str(l)) for r, l in stms] for key, stms in c.items()})
 
-class TestClassify(TestCase):
+class TestClassify(unittest.TestCase):
     def test_constraint(self):
         self.assertTrue(_tf.is_constraint(parse_rule(":-p.")))
         self.assertTrue(_tf.is_constraint(parse_rule("#false :- p.")))
@@ -101,7 +95,7 @@ class TestClassify(TestCase):
         self.assertFalse(_tf.is_normal(parse_rule("not a.")))
         self.assertFalse(_tf.is_normal(parse_rule("{a}.")))
 
-class TestProgramTransformer(TestCase):
+class TestProgramTransformer(unittest.TestCase):
     def test_rule(self):
         # simple rules
         self.assertEqual(transform_program("p."), (['#program initial(__t, __u).', 'p(__t).'], set(), {}))

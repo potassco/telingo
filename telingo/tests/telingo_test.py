@@ -5,13 +5,6 @@ import telingo
 import telingo.transformers as transformers
 from clingo.ast import ProgramBuilder
 
-class TestCase(unittest.TestCase):
-    def assertRaisesRegex(self, *args, **kwargs):
-        return (self.assertRaisesRegexp(*args, **kwargs)
-                if sys.version_info[0] < 3
-                else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
-
-
 def parse_model(m, s, dual):
     ret = []
     for sym in m.symbols(shown=True):
@@ -36,7 +29,7 @@ def solve(s, imin=0, dual=False, always=True):
     return sorted(r)
 
 
-class TestMain(TestCase):
+class TestMain(unittest.TestCase):
 
     def test_dynamic(self):
         self.assertEqual(
