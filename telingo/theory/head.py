@@ -92,7 +92,7 @@ def create_atom(rep, add_formula, positive):
             return create_atom(rep.arguments[0], add_formula, not positive)
         elif rep.name not in g_binary_operators and rep.name not in g_unary_operators and rep.name not in g_tel_operators and rep.name not in g_arithmetic_operators:
             return add_formula(TelAtom(positive, rep.name, [create_symbol(arg) for arg in rep.arguments]))
-    raise RuntimeError("invalid atom: ".format(rep))
+    raise RuntimeError("invalid atom: {}".format(rep))
 
 def create_formula(rep, add_formula):
     """
@@ -144,13 +144,13 @@ def create_formula(rep, add_formula):
                 elif arg.name == "true" or arg.name == "false":
                     return add_formula(TelConstant(arg.name == "true"))
                 else:
-                    raise RuntimeError("unknown identifier: ".format(rep))
+                    raise RuntimeError("unknown identifier: {}".format(rep))
             else:
-                raise RuntimeError("invalid temporal formula: ".format(rep))
+                raise RuntimeError("invalid temporal formula: {}".format(rep))
         else:
             return create_atom(rep, add_formula, True)
     else:
-        raise RuntimeError("invalid temporal formula: ".format(rep))
+        raise RuntimeError("invalid temporal formula: {}".format(rep))
 
 class ShiftFormula(_tf.TelTransformer):
     """
