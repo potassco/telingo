@@ -463,12 +463,12 @@ def transform_theory_atom(x):
             rhs = _ast.SymbolicTerm(atom.location, _clingo.Number(rhs))
 
         rng = (lhs, rhs)
-        other.setdefault(str(rng), (rng, {}))[1].setdefault(str(atm), atm)
+        other.setdefault(rng, (rng, {}))[1].setdefault(atm, atm)
 
     # split into numeric and symbolic ranges
     for atm, (lhs, rhs) in atoms:
         if isinstance(lhs, _Number) and isinstance(rhs, _Number):
-            numeric.setdefault(str(atm), (atm, IntervalSet()))[1].add((lhs, rhs+1))
+            numeric.setdefault(atm, (atm, IntervalSet()))[1].add((lhs, rhs+1))
         else:
             add(atm, lhs, rhs)
 
