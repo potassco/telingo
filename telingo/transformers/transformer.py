@@ -32,21 +32,21 @@ def str_location(loc):
     This function takes a location from a clingo AST and transforms it into a
     readable format.
     """
-    begin = loc["begin"]
-    end   = loc["end"]
-    ret = "{}:{}:{}".format(begin["filename"], begin["line"], begin["column"])
+    begin = loc.begin
+    end   = loc.end
+    ret = "{}:{}:{}".format(begin.filename, begin.line, begin.column)
     dash = True
-    eq = begin["filename"] == end["filename"]
+    eq = begin.filename == end.filename
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["filename"])
+        ret += "{}{}".format("-" if dash else ":", end.filename)
         dash = False
-    eq = eq and begin["line"] == end["line"]
+    eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["line"])
+        ret += "{}{}".format("-" if dash else ":", end.line)
         dash = False
-    eq = eq and begin["column"] == end["column"]
+    eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["column"])
+        ret += "{}{}".format("-" if dash else ":", end.column)
         dash = False
     return ret
 
@@ -57,18 +57,18 @@ def is_constraint(s):
     As a special case this function also considers rules with a negative
     literal in the head as a constraint.
     """
-    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Literal and
-            ((s.head.atom.type == _ast.ASTType.BooleanConstant and not s.head.atom.value) or
+    return (s.ast_type == _ast.ASTType.Rule and s.head.ast_type == _ast.ASTType.Literal and
+            ((s.head.atom.ast_type == _ast.ASTType.BooleanConstant and not s.head.atom.value) or
              (s.head.sign != _ast.Sign.NoSign)))
 
 def is_normal(s):
     """
     Check if the given statement is a normal rule.
     """
-    return (s.type == _ast.ASTType.Rule and
-            s.head.type == _ast.ASTType.Literal and
+    return (s.ast_type == _ast.ASTType.Rule and
+            s.head.ast_type == _ast.ASTType.Literal and
             s.head.sign == _ast.Sign.NoSign and
-            s.head.atom.type == _ast.ASTType.SymbolicAtom)
+            s.head.atom.ast_type == _ast.ASTType.SymbolicAtom)
 
 def is_disjunction(s):
     """
@@ -76,9 +76,9 @@ def is_disjunction(s):
 
     Normal rules and constraints are not conisdered disjunctions.
     """
-    return (s.type == _ast.ASTType.Rule and s.head.type == _ast.ASTType.Disjunction)
+    return (s.ast_type == _ast.ASTType.Rule and s.head.ast_type == _ast.ASTType.Disjunction)
 
-class Transformer:
+class TelTransformer:
     """
     Basic visitor to traverse and modify an AST.
 
@@ -95,9 +95,14 @@ class Transformer:
         """
         Visits and transforms the children of the given node.
         """
-        for key in x.child_keys:
-            setattr(x, key, self.visit(getattr(x, key), *args, **kwargs))
-        return x
+        updated = []
+        for key in x.keys:
+            if key in x.child_keys:
+                value = self.visit(getattr(x, key), *args, **kwargs)
+                updated.append(value)
+            else:
+                updated.append(getattr(x, key))
+        return x.__class__(*updated)
 
     def visit(self, x, *args, **kwargs):
         """
@@ -111,8 +116,8 @@ class Transformer:
         which are passed to node-specific visit functions and to the visit
         function called for child nodes.
         """
-        if hasattr(x, "type"):
-            attr = "visit_" + str(x.type)
+        if hasattr(x, "ast_type"):
+            attr = "visit_" + str(x.ast_type)
             if hasattr(self, attr):
                 return getattr(self, attr)(x, *args, **kwargs)
             else:

@@ -6,12 +6,7 @@ import telingo
 from numbers import Number
 from telingo import transformers as tf
 from telingo.theory import head as hd
-
-class TestCase(unittest.TestCase):
-    def assertRaisesRegex(self, *args, **kwargs):
-        return (self.assertRaisesRegexp(*args, **kwargs)
-            if sys.version_info[0] < 3
-            else unittest.TestCase.assertRaisesRegex(self, *args, **kwargs))
+from clingo.ast import ProgramBuilder
 
 def create_formula(atom):
     clause = []
@@ -22,16 +17,16 @@ def create_formula(atom):
 
 def theory_atoms(s):
     ctl = clingo.Control()
-    with ctl.builder() as b:
-        tf.transform([s], b.add)
-    ctl.ground([("initial", [0, 0]), ("always", [0, 0])])
+    with ProgramBuilder(ctl) as bld:
+        tf.transform([s], bld.add)
+    ctl.ground([("initial", [clingo.Number(0), clingo.Number(0)]), ("always", [clingo.Number(0), clingo.Number(0)])])
     ret = []
     for x in ctl.theory_atoms:
         ret.append(str(hd.translate_formula(x, lambda y: y)))
     ret.sort()
     return ret
 
-class TestTheoryHead(TestCase):
+class TestTheoryHead(unittest.TestCase):
     def test_transform(self):
         self.assertEqual(theory_atoms("&tel { >a }."), ['(1>a)@0'])
         self.assertEqual(theory_atoms("&tel { > >a }."), ['(1>(1>a))@0'])

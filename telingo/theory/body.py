@@ -158,7 +158,7 @@ class Atom(BodyFormula):
         """
         if data.literal is None:
             assert(step in range(0, ctx.horizon + 1))
-            sym = _clingo.Function(self.__name, self.__arguments + [step], self.__positive)
+            sym = _clingo.Function(self.__name, self.__arguments + [_clingo.Number(step)], self.__positive)
             sym_atom = ctx.symbols[sym]
             data.literal = sym_atom.literal if sym_atom is not None else ctx.false_literal
 

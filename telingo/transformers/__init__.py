@@ -86,11 +86,10 @@ def transform(inputs, callback):
     inputs   -- The list of inputs.
     callback -- Callback for rewritten statements.
     """
-    loc               = {'begin': {'line': 1, 'column': 1, 'filename': '<transform>'},
-                         'end':   {'line': 1, 'column': 1, 'filename': '<transform>'}}
+    loc = _ast.Location(_ast.Position('<transform>', 1, 1), _ast.Position('<transform>', 1, 1))
     future_predicates = set()
     constraint_parts  = {}
-    time              = _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
+    time              = _ast.SymbolicTerm(loc, _clingo.Function(_tf.g_time_parameter_name))
     wrap_lit          = lambda a: _ast.Literal(loc, _ast.Sign.NoSign, a)
 
     # apply transformer to program
@@ -100,7 +99,7 @@ def transform(inputs, callback):
     aux_rules = []
     transformer = _prg.ProgramTransformer(future_predicates, constraint_parts, aux_rules)
     for i in inputs:
-        _clingo.parse_program(i, lambda s: append(transformer.visit(s)))
+        _ast.parse_string(i, lambda s: append(transformer.visit(s)))
     if aux_rules:
         callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]))
         for rule in aux_rules:
@@ -112,7 +111,7 @@ def transform(inputs, callback):
         callback(_ast.Program(loc, "always", [_ast.Id(loc, _tf.g_time_parameter_name), _ast.Id(loc, _tf.g_time_parameter_name_alt)]))
         for name, arity, positive, shift in sorted(future_predicates):
             variables = [ _ast.Variable(loc, "{}{}".format(_tf.g_variable_prefix, i)) for i in range(arity) ]
-            s = _ast.Symbol(loc, _clingo.Number(shift))
+            s = _ast.SymbolicTerm(loc, _clingo.Number(shift))
             t_shifted = _ast.BinaryOperation(loc, _ast.BinaryOperator.Plus, time, s)
             add_sign = lambda lit: lit if positive else _ast.UnaryOperation(loc, _ast.UnaryOperator.Minus, lit)
             p_current = _ast.SymbolicAtom(add_sign(_ast.Function(loc, name, variables + [time], False)))
@@ -152,10 +151,10 @@ def transform(inputs, callback):
     reground_parts.append(('initial', 'initial', range(1)))
 
     def no_program(s):
-        if s.type != _ast.ASTType.Program:
+        if s.ast_type != _ast.ASTType.Program:
             callback(s)
 
-    _clingo.parse_program(_dedent('''\
+    _ast.parse_string(_dedent('''\
         #theory tel {
             formula_body  {
                 &   : 7, unary;         % prefix for keywords
@@ -217,7 +216,7 @@ def transform(inputs, callback):
         '''), no_program)
 
 
-    _clingo.parse_program(_dedent('''\
+    _ast.parse_string(_dedent('''\
         #theory del {
             formula_body  {
                 &   : 7, unary;         % prefix for keywords

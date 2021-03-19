@@ -16,7 +16,7 @@ g_tel_keywords = ["true", "false", "final", "initial"]
 g_tel_shift_variable = "__S"
 
 def time_parameter(loc):
-    return _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
+    return _ast.SymbolicTerm(loc, _clingo.Function(_tf.g_time_parameter_name))
 
 class Interval:
     def __init__(self, left, right):
@@ -160,8 +160,8 @@ class TheoryParser:
             self.__stack.append(_ast.TheoryFunction(b.location, operator, [b]))
         else:
             a = self.__stack.pop()
-            l = {"begin": a.location["begin"], "end": b.location["end"]}
-            self.__stack.append(_ast.TheoryFunction(l, operator, [a, b]))
+            loc = _ast.Location(a.location.begin, b.location.end)
+            self.__stack.append(_ast.TheoryFunction(loc, operator, [a, b]))
 
     def parse(self, x):
         """
@@ -192,7 +192,7 @@ def parse_raw_formula(x):
 
 # {{{1 theory_term -> term
 
-class TheoryTermToTermTransformer(_tf.Transformer):
+class TheoryTermToTermTransformer(_ast.Transformer):
     """
     This class transforms a given theory term into a plain term.
     """
@@ -211,11 +211,11 @@ class TheoryTermToTermTransformer(_tf.Transformer):
 
         If the function name refers to a temporal operator, an exception is thrown.
         """
-        isnum = lambda y: y.type == _ast.ASTType.Symbol and y.symbol.type == _clingo.SymbolType.Number
+        isnum = lambda y: y.ast_type == _ast.ASTType.SymbolicTerm and y.symbol.type == _clingo.SymbolType.Number
         if x.name == "-" and len(x.arguments) == 1:
             rhs = self(x.arguments[0])
             if isnum(rhs):
-                return _ast.Symbol(x.location, _clingo.Number(-rhs.symbol.number))
+                return _ast.SymbolicTerm(x.location, _clingo.Number(-rhs.symbol.number))
             else:
                 return _ast.UnaryOperation(x.location, _ast.UnaryOperator.Minus, rhs)
         elif (x.name == "+" or x.name == "-") and len(x.arguments) == 2:
@@ -225,7 +225,7 @@ class TheoryTermToTermTransformer(_tf.Transformer):
             if isnum(lhs) and isnum(rhs):
                 lhs = lhs.symbol.number
                 rhs = rhs.symbol.number
-                return _ast.Symbol(x.location, _clingo.Number(lhs + rhs if x.name == "+" else lhs - rhs))
+                return _ast.SymbolicTerm(x.location, _clingo.Number(lhs + rhs if x.name == "+" else lhs - rhs))
             else:
                 return _ast.BinaryOperation(x.location, op, lhs, rhs)
         elif x.name == "-" and len(x.arguments) == 2:
@@ -249,7 +249,7 @@ def theory_term_to_term(x):
 
 # {{{1 theory_term -> symbolic_atom
 
-class TheoryTermToAtomTransformer(_tf.Transformer):
+class TheoryTermToAtomTransformer(_ast.Transformer):
     """
     Turns the given theory term into an atom.
     """
@@ -269,7 +269,7 @@ class TheoryTermToAtomTransformer(_tf.Transformer):
             ret = _ast.UnaryOperation(location, _ast.UnaryOperator.Minus, ret)
         return _ast.SymbolicAtom(ret)
 
-    def visit_Symbol(self, x, positive):
+    def visit_SymbolicTerm(self, x, positive):
         """
         Maps functions to atoms.
 
@@ -325,7 +325,7 @@ def theory_term_to_atom(x, positive=True):
 
 # {{{1 theory transformers
 
-class TheoryAtomTransformer(_tf.Transformer):
+class TheoryAtomTransformer(_ast.Transformer):
     """
     Transforms the given theory atom to be processed further.
     """
@@ -347,13 +347,13 @@ class TheoryAtomTransformer(_tf.Transformer):
             elif isinstance(a, _Number) and isinstance(b, _Number):
                 return a + b
             else:
-                lhs = _ast.Symbol(location, _clingo.Number(a)) if isinstance(a, _Number) else a
-                rhs = _ast.Symbol(location, _clingo.Number(b)) if isinstance(b, _Number) else b
+                lhs = _ast.SymbolicTerm(location, _clingo.Number(a)) if isinstance(a, _Number) else a
+                rhs = _ast.SymbolicTerm(location, _clingo.Number(b)) if isinstance(b, _Number) else b
                 return _clingo.ast.BinaryOperation(location, _ast.BinaryOperator.Plus, lhs, rhs)
 
         return add(left, rng[0]), add(right, rng[1])
 
-    def visit_Symbol(self, x, rng):
+    def visit_SymbolicTerm(self, x, rng):
         self.__add_atom(x, rng)
         return x
 
@@ -396,11 +396,11 @@ class TheoryAtomTransformer(_tf.Transformer):
                     lhs = 1
                 else:
                     lhs = theory_term_to_term(x.arguments[0])
-                    if lhs.type == _ast.ASTType.Symbol and lhs.symbol.type == _clingo.SymbolType.Number:
+                    if lhs.ast_type == _ast.ASTType.SymbolicTerm and lhs.symbol.type == _clingo.SymbolType.Number:
                         lhs = lhs.symbol.number
                 self(rhs, self.__add_range(x.location, rng, lhs, lhs))
             elif x.name == "&" and lhs is None:
-                if rhs.type != _ast.ASTType.Symbol or len(rhs.symbol.arguments) != 0 or rhs.symbol.name not in g_tel_keywords:
+                if rhs.ast_type != _ast.ASTType.SymbolicTerm or len(rhs.symbol.arguments) != 0 or rhs.symbol.name not in g_tel_keywords:
                     raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
             else:
                 rng_left, rng_right = rng, rng
@@ -422,9 +422,9 @@ class TheoryAtomTransformer(_tf.Transformer):
         Transforms one elementary theory elements without conditions into formulas.
         """
         # NOTE: in principle this condition can be relaxed...
-        if len(x.tuple) != 1 or len(x.condition) != 0:
+        if len(x.terms) != 1 or len(x.condition) != 0:
             raise RuntimeError("invalid temporal formula in rule head: {}".format(_tf.str_location(x.location)))
-        x.tuple[0] = self(x.tuple[0], (0, 0))
+        x.terms[0] = self(x.terms[0], (0, 0))
         return x
 
     def visit_TheoryAtom(self, x):
@@ -454,19 +454,19 @@ def transform_theory_atom(x):
     # add to symbolic ranges converting numeric ranges
     def add(atm, lhs, rhs):
         if isinstance(lhs, _Number):
-            lhs = _ast.Symbol(atom.location, _clingo.Number(lhs))
+            lhs = _ast.SymbolicTerm(atom.location, _clingo.Number(lhs))
         if rhs == float("inf"):
-            rhs = _ast.Symbol(atom.location, _clingo.Supremum)
+            rhs = _ast.SymbolicTerm(atom.location, _clingo.Supremum)
         elif isinstance(rhs, _Number):
-            rhs = _ast.Symbol(atom.location, _clingo.Number(rhs))
+            rhs = _ast.SymbolicTerm(atom.location, _clingo.Number(rhs))
 
         rng = (lhs, rhs)
-        other.setdefault(str(rng), (rng, {}))[1].setdefault(str(atm), atm)
+        other.setdefault(rng, (rng, {}))[1].setdefault(atm, atm)
 
     # split into numeric and symbolic ranges
     for atm, (lhs, rhs) in atoms:
         if isinstance(lhs, _Number) and isinstance(rhs, _Number):
-            numeric.setdefault(str(atm), (atm, IntervalSet()))[1].add((lhs, rhs+1))
+            numeric.setdefault(atm, (atm, IntervalSet()))[1].add((lhs, rhs+1))
         else:
             add(atm, lhs, rhs)
 
@@ -484,7 +484,7 @@ def transform_theory_atom(x):
 
 # {{{1 get_variables
 
-class VariablesVisitor(_tf.Transformer):
+class VariablesVisitor(_ast.Transformer):
     """
     Visitor to collect variables.
 
@@ -563,11 +563,10 @@ class HeadTransformer:
             for (lhs, rhs), heads in ranges:
                 cond = []
                 diff = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, param, shift)
-
-                if lhs.type != _ast.ASTType.Symbol or lhs.symbol.type != _clingo.SymbolType.Number or lhs.symbol.number > 0:
+                if lhs.ast_type != _ast.ASTType.SymbolicTerm or lhs.symbol.type != _clingo.SymbolType.Number or lhs.symbol.number > 0:
                     cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, lhs, diff)))
 
-                if rhs.type != _ast.ASTType.Symbol or rhs.symbol.type != _clingo.SymbolType.Supremum:
+                if rhs.ast_type != _ast.ASTType.SymbolicTerm or rhs.symbol.type != _clingo.SymbolType.Supremum:
                     cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, diff, rhs)))
 
                 elems.extend([_ast.ConditionalLiteral(loc, _ast.Literal(loc, _ast.Sign.NoSign, head), cond) for head in heads])

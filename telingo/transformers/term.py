@@ -5,12 +5,13 @@ Classes:
 TermTransformer -- Class to transform terms.
 """
 
-from . import transformer as _tf
 
 import clingo as _clingo
 from clingo import ast as _ast
 
-class TermTransformer(_tf.Transformer):
+from . import transformer as _tf
+
+class TermTransformer(_ast.Transformer):
     """
     This class traverses the AST of a term until a Function is found. It then
     add a time parameter to its argument and optionally rewrites the and
@@ -100,8 +101,7 @@ class TermTransformer(_tf.Transformer):
 
         if initially and finally_:
             raise RuntimeError("finally and initially operator cannot used together: {}".format(_tf.str_location(location)))
-
-        params = [_ast.Symbol(location, _clingo.Function(_tf.g_time_parameter_name))]
+        params = [_ast.SymbolicTerm(location, _clingo.Function(_tf.g_time_parameter_name))]
         if fail_future and (shift > 0 or finally_):
             raise RuntimeError("future atoms not supported in this context: {}".format(_tf.str_location(location)))
         if fail_past and (shift < 0 or initially):
@@ -110,13 +110,13 @@ class TermTransformer(_tf.Transformer):
             if replace_future:
                 self.__future_predicates.add((n, arity, self.__positive, shift))
                 n = _tf.g_future_prefix + n
-                params.insert(0, _ast.Symbol(location, shift))
+                params.insert(0, _ast.SymbolicTerm(location, _clingo.Number(shift)))
             else:
                 max_shift[0] = max(max_shift[0], shift)
         if shift != 0:
-            params[-1] = _ast.BinaryOperation(location, _ast.BinaryOperator.Plus, params[-1], _ast.Symbol(location, shift))
+            params[-1] = _ast.BinaryOperation(location, _ast.BinaryOperator.Plus, params[-1], _ast.SymbolicTerm(location, _clingo.Number(shift)))
         elif initially:
-            params[-1] = _ast.Symbol(location, 0)
+            params[-1] = _ast.SymbolicTerm(location, _clingo.Number(0))
         return (n, params)
 
     def visit_UnaryOperation(self, term, *args, **kwargs):
@@ -125,7 +125,7 @@ class TermTransformer(_tf.Transformer):
         """
         try:
             self.__positive = not self.__positive
-            return self.visit_children(term, *args, **kwargs)
+            return term.update(**self.visit_children(term, *args, **kwargs))
         finally:
             self.__positive = not self.__positive
         return term
@@ -140,7 +140,7 @@ class TermTransformer(_tf.Transformer):
         term.arguments.extend(params)
         return term
 
-    def visit_Symbol(self, term, *args, **kwargs):
+    def visit_SymbolicTerm(self, term, *args, **kwargs):
         """
         Raises a runtime error.
 
@@ -148,4 +148,3 @@ class TermTransformer(_tf.Transformer):
         could occur in a valid AST.
         """
         raise RuntimeError("not implemented")
-

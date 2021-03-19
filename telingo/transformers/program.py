@@ -12,7 +12,7 @@ from . import head as _th
 import clingo as _clingo
 from clingo import ast as _ast
 
-class ProgramTransformer(_tf.Transformer):
+class ProgramTransformer(_ast.Transformer):
     """
     Rewrites all temporal operators in a logic program.
 
@@ -52,7 +52,8 @@ class ProgramTransformer(_tf.Transformer):
 
     def __append_final(self, x, param=None):
         loc = x.location
-        x.body.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.SymbolicAtom(_ast.Function(loc, "__final", [_ast.Symbol(loc, param)] if param is not None else [], False))));
+        fun = _ast.Function(loc, "__final", [_ast.SymbolicTerm(loc, param)] if param is not None else [], False)
+        x.body.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.SymbolicAtom(fun)));
 
     def visit(self, x, *args, **kwargs):
         """
@@ -64,8 +65,10 @@ class ProgramTransformer(_tf.Transformer):
         """
         if self.__final and isinstance(x, _ast.AST) and hasattr(x, "body"):
             self.__append_final(x)
-        ret = _tf.Transformer.visit(self, x, *args, **kwargs)
-        return ret
+        if isinstance(x, _ast.ASTSequence):
+            return _ast.Transformer.visit_sequence(self, x, *args, **kwargs)
+
+        return _ast.Transformer.visit(self, x, *args, **kwargs)
 
     def visit_Rule(self, rule):
         """
@@ -101,7 +104,7 @@ class ProgramTransformer(_tf.Transformer):
         try:
             self.__negation = literal.sign != _ast.Sign.NoSign
             self.__head = self.__head and literal.sign == _ast.Sign.NoSign
-            return self.visit_children(literal)
+            return literal.update(**self.visit_children(literal))
         finally:
             self.__negation = False
             self.__head = head
@@ -126,7 +129,7 @@ class ProgramTransformer(_tf.Transformer):
         If this atom appears in a head then it is also replaced by a
         corresponding future atom defined later.
         """
-        atom.term = self.__term_transformer.visit(atom.term, self.__head, not self.__constraint and (not self.__head or not self.__normal), self.__head, self.__max_shift)
+        atom.symbol = self.__term_transformer.visit(atom.symbol, self.__head, not self.__constraint and (not self.__head or not self.__normal), self.__head, self.__max_shift)
         return atom
 
     def visit_TheoryAtom(self, atom):
@@ -138,13 +141,13 @@ class ProgramTransformer(_tf.Transformer):
         `__final`, and atoms of form `&true` and `&false` are rewritten to
         `#true` and `#false`.
         """
-        if atom.term.type == _ast.ASTType.Function and len(atom.term.arguments) == 0:
-            time = lambda loc: _ast.Symbol(loc, _clingo.Function(_tf.g_time_parameter_name))
+        if atom.term.ast_type == _ast.ASTType.Function and len(atom.term.arguments) == 0:
+            time = lambda loc: _ast.SymbolicTerm(loc, _clingo.Function(_tf.g_time_parameter_name))
             wrap = lambda loc, atom: _ast.Literal(loc, _ast.Sign.DoubleNegation, atom) if self.__head else atom
             if atom.term.name == "del" :
                 if not self.__negation and not self.__constraint:
                         raise RuntimeError("dynamic formulas not supported in this context: {}".format(_tf.str_location(atom.location)))
-                atom.term.arguments = [_ast.Symbol(atom.term.location, _clingo.Function("__t"))]
+                atom.term.arguments = [_ast.SymbolicTerm(atom.term.location, _clingo.Function("__t"))]
             elif atom.term.name == "tel" :
                 if self.__head:
                     atom, rules = self.__head_transformer.transform(atom)
@@ -153,7 +156,7 @@ class ProgramTransformer(_tf.Transformer):
                     if not self.__negation and not self.__constraint:
                         raise RuntimeError("temporal formulas not supported in this context: {}".format(_tf.str_location(atom.location)))
                     for element in atom.elements:
-                        if len(element.tuple) != 1:
+                        if len(element.terms) != 1:
                             raise RuntimeError("invalid temporal formula: {}".format(_tf.str_location(atom.location)))
                         self.visit(element.condition)
                     atom.term = self.__term_transformer.visit(atom.term, False, True, True, self.__max_shift)

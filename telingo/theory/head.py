@@ -10,17 +10,21 @@ from . import body as _bd
 from .formula import *
 import itertools as _it
 import functools as _ft
+from clingo import ast as _ast
+
 
 def new_tuple(name, fields, keys, tostring=None):
     ret = _namedtuple(name, fields)
     ret.child_keys = keys
-    ret.type = name
+    ret.ast_type = name
+    ret.keys = fields
     if tostring is not None:
         ret.__str__ = tostring
     ret._rep = property(ret.__str__, "get string representation of tuple")
     return ret
 
-class FormulaToStr(_tf.Transformer):
+
+class FormulaToStr(_tf.TelTransformer):
     """
     Converts head formuals to string.
     """
@@ -68,6 +72,7 @@ TelClause = new_tuple("TelClause", ["elements", "conjunctive"], ["elements"], fo
 TelNegation = new_tuple("TelNegation", ["rhs"], ["rhs"], formula_to_str)
 TelConstant = new_tuple("TelConstant", ["value"], [], formula_to_str)
 TelShift = new_tuple("TelShift", ["lhs", "rhs"], [], formula_to_str)
+
 
 def create_atom(rep, add_formula, positive):
     """
@@ -147,7 +152,7 @@ def create_formula(rep, add_formula):
     else:
         raise RuntimeError("invalid temporal formula: {}".format(rep))
 
-class ShiftFormula(_tf.Transformer):
+class ShiftFormula(_tf.TelTransformer):
     """
     Shifts the given formula.
     """
@@ -181,7 +186,7 @@ class ShiftFormula(_tf.Transformer):
 def shift_formula(x, shift):
     return ShiftFormula(shift)(x)
 
-class UnfoldFormula(_tf.Transformer):
+class UnfoldFormula(_tf.TelTransformer):
     """
     Unfolds the given formula into normal rules.
     """
@@ -199,7 +204,7 @@ class UnfoldFormula(_tf.Transformer):
 def unfold_formula(x):
     return UnfoldFormula()(x)
 
-class HeadFormulaToBodyFormula(_tf.Transformer):
+class HeadFormulaToBodyFormula(_tf.TelTransformer):
     def __init__(self, add_formula):
         self.__add_formula = add_formula
 
@@ -228,13 +233,13 @@ class HeadFormulaToBodyFormula(_tf.Transformer):
 def head_formula_to_body_formula(x, add_formula):
     return HeadFormulaToBodyFormula(add_formula)(x)
 
-class ClauseToRule(_tf.Transformer):
+class ClauseToRule(_tf.TelTransformer):
     def __init__(self, head, body):
         self.__head = head
         self.__body = body
 
     def visit_TelAtom(self, x, ctx, step):
-        sym  = _clingo.Function(x.name, x.arguments + [step], x.positive)
+        sym  = _clingo.Function(x.name, x.arguments + [_clingo.Number(step)], x.positive)
         atom = ctx.symbols[sym]
         if atom is not None:
             self.__head.append(atom.literal)

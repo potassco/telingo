@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 *.egg-info/
 *.swp
+.DS_Store
+.mypy_cache/
