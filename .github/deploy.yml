@@ -1,0 +1,112 @@
+# do not edit the workflows, they are generated from this file
+pip:
+    pure: True
+    version: |
+        version = None
+        with open('setup.py') as fh:
+            for line in fh:
+                m = match(r'''[ ]*version[ ]*=[ ]*['"]([0-9]+\.[0-9]+\.[0-9]+)(\.post[0-9]+)?['"]''', line)
+                if m is not None:
+                    version = m.group(1)
+    build_depends_release: |
+        python3 -m pip install --user clingo
+    build_depends_dev: |
+        python3 -m pip install --user --extra-index-url https://test.pypi.org/simple/ clingo-cffi
+
+conda:
+    package_name:
+        'telingo'
+    os: 
+        - 'ubuntu-latest'
+    channels_release:
+        - 'potassco'
+    channels_dev:
+        - 'potassco'
+        - 'potassco/label/dev'
+    version: |
+        version = None
+        with open('setup.py') as fh:
+            for line in fh:
+                m = match(r'''[ ]*version[ ]*=[ ]*['"]([0-9]+\.[0-9]+\.[0-9]+)(\.post[0-9]+)?['"]''', line)
+                if m is not None:
+                    version = m.group(1)
+        assert version is not None
+    meta:
+      url: https://github.com/potassco/{{ name }}/archive/v{{ version }}.tar.gz
+      git_url: https://github.com/potassco/{{ name }}.git
+      requirements:
+        host:
+          - python >=3.5
+          - pip
+          - clingo >=5.5.0
+        run:
+          - python >=3.5
+          - clingo >=5.5.0
+      build:
+        noarch: python
+        script: 'python -m pip install --no-deps --ignore-installed .'
+      about:
+        home: https://potassco.org/
+        license: MIT
+        summary: Library with auxilary functions to use along with clingo's python module.
+        license_file: LICENSE
+        doc_url: https://potassco.org/
+        dev_url: https://github.com/potassco/{{ name }}
+
+ppa:
+    package_name:
+        'python3-clingox'
+    upstream_name:
+        'telingo'
+    initial_version:
+        '1.0.0'
+    initial_date:
+        'Sat, 21 Feb 2021 12:00:00 +0100'
+    contact_url:
+        'https://github.com/potassco/telingo/issues'
+    source_url:
+        'https://github.com/potassco/telingo'
+    version:
+        $(sed -n "/version[ ]*=/s/.*['\"]\([0-9]\+\.[0-9]\+\.[0-9]\+.*\)['\"].*/\1/p" ../../setup.py)
+    build_depends:
+        - 'dh-python'
+        - 'python3-all'
+    create_depends:
+        - 'python3-clingo'
+    sync_patterns:
+        - 'telingo'
+        - 'setup.py'
+        - 'README.md'
+        - 'LICENSE.md'
+    sync_script: |
+        sed -i 's/clingo-cffi/clingo/g' "${rep}/setup.py"
+    distributions:
+        focal:
+        bionic:
+            source:
+                Build-Depends: 'debhelper-compat (= 11), dh-python, python3-all, python3-setuptools'
+    source:
+        Source: 'python3-clingox'
+        Section: 'devel'
+        Priority: 'optional'
+        Maintainer: 'Roland Kaminski <kaminski@cs.uni-potsdam.de>'
+        Build-Depends: 'debhelper-compat (= 12), dh-python, python3-all, python3-setuptools'
+        Standards-Version: '4.4.1'
+        Homepage: 'https://potassco.org/'
+        Vcs-Browser: 'https://github.com/potassco/telingo'
+        Vcs-Git: 'https://github.com/potassco/telingo.git'
+    packages:
+        python3-clingox:
+            Architecture: 'any'
+            Depends: '${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}'
+            Description: 'Support library for the clingo package.'
+    files:
+        docs: |
+            README.md
+        py3dist-overrides: |
+            clingo python3-clingo
+        rules: |
+            #!/usr/bin/make -f
+            
+            %:
+            	dh $@ --with python3 --buildsystem=pybuild
