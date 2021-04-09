@@ -55,7 +55,7 @@ conda:
 
 ppa:
     package_name:
-        'python3-clingox'
+        'python3-telingo'
     upstream_name:
         'telingo'
     initial_version:
@@ -86,7 +86,7 @@ ppa:
             source:
                 Build-Depends: 'debhelper-compat (= 11), dh-python, python3-all, python3-setuptools'
     source:
-        Source: 'python3-clingox'
+        Source: 'python3-telingo'
         Section: 'devel'
         Priority: 'optional'
         Maintainer: 'Roland Kaminski <kaminski@cs.uni-potsdam.de>'
@@ -96,7 +96,7 @@ ppa:
         Vcs-Browser: 'https://github.com/potassco/telingo'
         Vcs-Git: 'https://github.com/potassco/telingo.git'
     packages:
-        python3-clingox:
+        python3-telingo:
             Architecture: 'any'
             Depends: '${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}'
             Description: 'Support library for the clingo package.'

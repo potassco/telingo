@@ -61,9 +61,9 @@ for act in "${@}"; do
             ;;
         changes)
             VERSION="$(sed -n "/version[ ]*=/s/.*['\"]\([0-9]\+\.[0-9]\+\.[0-9]\+.*\)['\"].*/\1/p" ../../setup.py)"
-            BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${ref}/ubuntu/pool/main/p/python3-clingox/ | sed -n "/${rep}[0-9]\+\.dsc/s/.*${rep}\([0-9]\+\).*/\1/p" | sort -rn | head -1)
+            BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${ref}/ubuntu/pool/main/p/python3-telingo/ | sed -n "/${rep}[0-9]\+\.dsc/s/.*${rep}\([0-9]\+\).*/\1/p" | sort -rn | head -1)
             cat > ${rep}/debian/changelog <<EOF
-python3-clingox (${VERSION}-${rep}$[BUILD+1]) ${rep}; urgency=medium
+python3-telingo (${VERSION}-${rep}$[BUILD+1]) ${rep}; urgency=medium
 
   * build for git revision $(git rev-parse HEAD)
 
@@ -75,13 +75,13 @@ EOF
             (
                 cd "${rep}"
                 pdebuild --buildresult .. --auto-debsign --debsign-k 744d959e10f5ad73f9cf17cc1d150536980033d5 -- --basetgz /var/cache/pbuilder/${ref}-${rep}.tgz --source-only-changes
-                sed -i '/\.buildinfo$/d' ../python3-clingox_${VERSION}_source.changes
-                debsign --no-re-sign -k744d959e10f5ad73f9cf17cc1d150536980033d5 ../python3-clingox_${VERSION}_source.changes
+                sed -i '/\.buildinfo$/d' ../python3-telingo_${VERSION}_source.changes
+                debsign --no-re-sign -k744d959e10f5ad73f9cf17cc1d150536980033d5 ../python3-telingo_${VERSION}_source.changes
             )
             ;;
         put)
             VERSION="$(head -n 1 ${rep}/debian/changelog | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-z0-9]\+\)\?')"
-            dput ppa:potassco/${ref} python3-clingox_${VERSION}_source.changes
+            dput ppa:potassco/${ref} python3-telingo_${VERSION}_source.changes
             ;;
         clean)
             rm -rf \
@@ -91,9 +91,9 @@ EOF
                 "${rep}"/LICENSE.md \
                 "${rep}"/debian/files \
                 "${rep}"/debian/.debhelper \
-                "${rep}"/debian/python3-clingox.debhelper.log \
-                "${rep}"/debian/python3-clingox.substvars \
-                "${rep}"/debian/python3-clingox \
+                "${rep}"/debian/python3-telingo.debhelper.log \
+                "${rep}"/debian/python3-telingo.substvars \
+                "${rep}"/debian/python3-telingo \
                 "${rep}"/debian/debhelper-build-stamp \
                 "${rep}"/debian/tmp \
                 "${rep}"/obj-x86_64-linux-gnu \
