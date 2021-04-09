@@ -2,7 +2,7 @@ Source: python3-telingo
 Section: devel
 Priority: optional
 Maintainer: Roland Kaminski <kaminski@cs.uni-potsdam.de>
-Build-Depends: debhelper-compat (= 12), dh-python, python3-all, python3-setuptools
+Build-Depends: debhelper-compat (= 12), dh-python, python3-all, python3-setuptools, python3-clingo
 Standards-Version: 4.4.1
 Homepage: https://potassco.org/
 Vcs-Browser: https://github.com/potassco/telingo
