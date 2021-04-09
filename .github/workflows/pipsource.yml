@@ -1,6 +1,7 @@
 name: Deploy pip source package (wip)
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       wip:

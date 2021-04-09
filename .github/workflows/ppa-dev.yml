@@ -1,6 +1,7 @@
 name: Deploy ppa package (wip)
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       wip:
