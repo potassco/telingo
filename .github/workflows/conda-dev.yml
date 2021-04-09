@@ -1,7 +1,6 @@
 name: Deploy conda packages (wip)
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       wip:
