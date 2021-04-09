@@ -62,7 +62,6 @@ for act in "${@}"; do
         changes)
             VERSION="$(sed -n "/version[ ]*=/s/.*['\"]\([0-9]\+\.[0-9]\+\.[0-9]\+.*\)['\"].*/\1/p" ../../setup.py)"
             BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${ref}/ubuntu/pool/main/p/python3-telingo/ | sed -n "/${rep}[0-9]\+\.dsc/s/.*${rep}\([0-9]\+\).*/\1/p" | sort -rn | head -1)
-            BUILD=1
             cat > ${rep}/debian/changelog <<EOF
 python3-telingo (${VERSION}-${rep}$[BUILD+1]) ${rep}; urgency=medium
 
