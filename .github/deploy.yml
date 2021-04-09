@@ -49,7 +49,7 @@ conda:
         home: https://potassco.org/
         license: MIT
         summary: Library with auxilary functions to use along with clingo's python module.
-        license_file: LICENSE
+        license_file: LICENSE.md
         doc_url: https://potassco.org/
         dev_url: https://github.com/potassco/{{ name }}
 
