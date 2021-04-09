@@ -55,7 +55,7 @@ for act in "${@}"; do
                 ../../telingo \
                 ../../setup.py \
                 ../../README.md \
-                ../../LICENSE \
+                ../../LICENSE.md \
                 $rep/
             sed -i 's/clingo-cffi/clingo/g' "${rep}/setup.py"
             ;;
@@ -88,7 +88,7 @@ EOF
                 "${rep}"/telingo \
                 "${rep}"/setup.py \
                 "${rep}"/README.md \
-                "${rep}"/LICENSE \
+                "${rep}"/LICENSE.md \
                 "${rep}"/debian/files \
                 "${rep}"/debian/.debhelper \
                 "${rep}"/debian/python3-clingox.debhelper.log \
