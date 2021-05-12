@@ -44,7 +44,9 @@ conda:
           - clingo >=5.5.0
       build:
         noarch: python
-        script: 'python -m pip install --no-deps --ignore-installed .'
+        script: 'python setup.py install --single-version-externally-managed --record record.txt'
+        entry_points:
+          - telingo = telingo:main
       about:
         home: https://potassco.org/
         license: MIT

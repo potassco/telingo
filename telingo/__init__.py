@@ -15,6 +15,7 @@ from . import theory as _ty
 
 import sys as _sys
 import clingo as _clingo
+import clingo.ast as _ast
 import textwrap as _textwrap
 
 def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
@@ -85,7 +86,7 @@ class Application:
         See clingo.clingo_main().
         """
         self.program_name = "telingo"
-        self.version = "2.1.0"
+        self.version = "2.1.1"
 
         self.__imin = 0
         self.__imax = None
@@ -163,7 +164,7 @@ class Application:
         This function implements the Application.main() function as required by
         clingo.clingo_main().
         """
-        with prg.builder() as b:
+        with _ast.ProgramBuilder(prg) as b:
             files = [open(f) for f in files]
             if len(files) == 0:
                 files.append(_sys.stdin)
