@@ -1,5 +1,8 @@
 # Changes
 
+## telingo-2.1.1
+  * fix issues with application
+
 ## telingo-2.1.0
   * port to clingo 5.5.0
 
