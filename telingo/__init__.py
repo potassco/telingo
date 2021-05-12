@@ -86,7 +86,7 @@ class Application:
         See clingo.clingo_main().
         """
         self.program_name = "telingo"
-        self.version = "2.1.1"
+        self.version = "2.1.2"
 
         self.__imin = 0
         self.__imax = None
