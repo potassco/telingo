@@ -57,7 +57,6 @@ for act in "${@}"; do
                 ../../README.md \
                 ../../LICENSE.md \
                 $rep/
-            sed -i 's/clingo-cffi/clingo/g' "${rep}/setup.py"
             ;;
         changes)
             VERSION="$(sed -n "/version[ ]*=/s/.*['\"]\([0-9]\+\.[0-9]\+\.[0-9]\+.*\)['\"].*/\1/p" ../../setup.py)"

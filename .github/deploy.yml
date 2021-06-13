@@ -80,8 +80,6 @@ ppa:
         - 'setup.py'
         - 'README.md'
         - 'LICENSE.md'
-    sync_script: |
-        sed -i 's/clingo-cffi/clingo/g' "${rep}/setup.py"
     distributions:
         focal:
         bionic:
