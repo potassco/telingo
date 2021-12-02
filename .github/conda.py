@@ -23,7 +23,7 @@ def get_build_number(channels, version):
 
     build_number = -1
     for pkg in pkgs.get(NAME, []):
-        if pkg['channel'].find(channels[-1]) >= 0 and pkg["version"] == version:
+        if pkg['channel'].find(channels[0]) >= 0 and pkg["version"] == version:
             build_number = max(build_number, pkg['build_number'])
 
     return build_number + 1
@@ -69,7 +69,7 @@ def run():
         options.extend(['-c', c])
     options.append(recipe_path)
 
-    subprocess.call(options, env=build_env)
+    subprocess.check_call(options, env=build_env)
 
 if __name__ == '__main__':
     run()
