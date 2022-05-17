@@ -303,9 +303,9 @@ class HeadFormula(Formula):
         undfolded = unfold_formula(shifted)
 
         if len(self.__literals) > 1:
-            body = backend.atom()
+            body = ctx.backend.atom()
             for x in self.__literals:
-                backend.add_rule(body, [x])
+                ctx.backend.add_rule(body, [x])
             self.__literals = [body]
 
         for clause in undfolded:
