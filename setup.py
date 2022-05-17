@@ -10,7 +10,7 @@ setup(
     author_email='kaminski@cs.uni-potsdam.de',
     url='https://github.com/potassco/telingo',
     license = 'MIT',
-    install_requires=['clingo'],
+    install_requires=['clingo>=5.6'],
     packages = ['telingo', 'telingo.theory', 'telingo.transformers'],
     test_suite = 'telingo.tests',
     zip_safe = False,

@@ -564,10 +564,10 @@ class HeadTransformer:
                 cond = []
                 diff = _ast.BinaryOperation(loc, _ast.BinaryOperator.Minus, param, shift)
                 if lhs.ast_type != _ast.ASTType.SymbolicTerm or lhs.symbol.type != _clingo.SymbolType.Number or lhs.symbol.number > 0:
-                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, lhs, diff)))
+                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(lhs, [_ast.Guard(_ast.ComparisonOperator.LessEqual, diff)])))
 
                 if rhs.ast_type != _ast.ASTType.SymbolicTerm or rhs.symbol.type != _clingo.SymbolType.Supremum:
-                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(_ast.ComparisonOperator.LessEqual, diff, rhs)))
+                    cond.append(_ast.Literal(loc, _ast.Sign.NoSign, _ast.Comparison(diff, [_ast.Guard(_ast.ComparisonOperator.LessEqual, rhs)])))
 
                 elems.extend([_ast.ConditionalLiteral(loc, _ast.Literal(loc, _ast.Sign.NoSign, head), cond) for head in heads])
 
