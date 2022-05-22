@@ -3,22 +3,25 @@ The telingo module contains functions to translate and solve temporal logic
 programs.
 
 Classes:
-Application -- Main application class.
+TelApp -- Main application class.
 
 Functions:
 imain -- Function to run the incremetal solving loop.
 main  -- Main function starting an extended clingo application.
 """
 
+import sys
+from textwrap import dedent
+
+from clingo import ast
+from clingo.symbol import Function, Number, SymbolType
+from clingo.application import clingo_main, Application
+
 from . import transformers as _tf
 from . import theory as _ty
 
-import sys as _sys
-import clingo as _clingo
-import clingo.ast as _ast
-import textwrap as _textwrap
 
-def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, istop = "SAT"):
+def imain(prg, future_sigs, program_parts, on_model, imin=0, imax=None, istop="SAT"):
     """
     Take a program object and runs the incremental main solving loop.
 
@@ -45,26 +48,26 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
     imax          -- Maximum number of iterations.
     istop         -- When to stop.
     """
-    f = _ty.Theory()
+    thy = _ty.Theory()
     step, ret = 0, None
     while ((imax is None or step < imax) and
            (step == 0 or step < imin or (
-              (istop == "SAT"     and not ret.satisfiable) or
-              (istop == "UNSAT"   and not ret.unsatisfiable) or
-              (istop == "UNKNOWN" and not ret.unknown)))):
+               (istop == "SAT" and not ret.satisfiable) or
+               (istop == "UNSAT" and not ret.unsatisfiable) or
+               (istop == "UNKNOWN" and not ret.unknown)))):
         parts = []
         for root_name, part_name, rng in program_parts:
             for i in rng:
                 if ((step - i >= 0 and root_name == "always") or
-                    (step - i  > 0 and root_name == "dynamic") or
-                    (step - i == 0 and root_name == "initial")):
-                    parts.append((part_name, [_clingo.Number(step - i), _clingo.Number(step)]))
+                        (step - i > 0 and root_name == "dynamic") or
+                        (step - i == 0 and root_name == "initial")):
+                    parts.append((part_name, [Number(step - i), Number(step)]))
         if step > 0:
-            prg.release_external(_clingo.Function("__final", [_clingo.Number(step-1)]))
+            prg.release_external(Function("__final", [Number(step-1)]))
             prg.cleanup()
         prg.ground(parts)
-        f.translate(step, prg)
-        prg.assign_external(_clingo.Function("__final", [_clingo.Number(step)]), True)
+        thy.translate(step, prg)
+        prg.assign_external(Function("__final", [Number(step)]), True)
         assumptions = []
         for name, arity, positive in future_sigs:
             for atom in prg.symbolic_atoms.by_signature(name, arity, positive):
@@ -72,7 +75,8 @@ def imain(prg, future_sigs, program_parts, on_model, imin = 0, imax = None, isto
                     assumptions.append(-atom.literal)
         ret, step = prg.solve(on_model=lambda m: on_model(m, step), assumptions=assumptions), step+1
 
-class Application:
+
+class TelApp(Application):
     """
     Application object as accepted by clingo.clingo_main().
 
@@ -101,6 +105,7 @@ class Application:
         model -- The model to print.
         horizon -- The number of states.
         """
+        # pylint: disable=unused-argument
         self.__horizon = horizon
 
     def __parse_imin(self, value):
@@ -117,9 +122,8 @@ class Application:
         if len(value) > 0:
             self.__imax = int(value)
             return self.__imax >= 0
-        else:
-            self.__imax = None
-            return True
+        self.__imax = None
+        return True
 
     def __parse_istop(self, value):
         """
@@ -131,19 +135,19 @@ class Application:
     def print_model(self, model, printer):
         table = {}
         for sym in model.symbols(shown=True):
-            if sym.type == _clingo.SymbolType.Function and len(sym.arguments) > 0:
-                table.setdefault(sym.arguments[-1].number, []).append(_clingo.Function(sym.name, sym.arguments[:-1], sym.positive))
+            if sym.type == SymbolType.Function and len(sym.arguments) > 0:
+                table.setdefault(sym.arguments[-1].number, []).append(Function(sym.name, sym.arguments[:-1], sym.positive))
         for step in range(self.__horizon+1):
             symbols = table.get(step, [])
-            _sys.stdout.write(" State {}:".format(step))
+            sys.stdout.write(" State {}:".format(step))
             sig = None
             for sym in sorted(symbols):
                 if not sym.name.startswith('__'):
                     if (sym.name, len(sym.arguments), sym.positive) != sig:
-                        _sys.stdout.write("\n ")
+                        sys.stdout.write("\n ")
                         sig = (sym.name, len(sym.arguments), sym.positive)
-                    _sys.stdout.write(" {}".format(sym))
-            _sys.stdout.write("\n")
+                    sys.stdout.write(" {}".format(sym))
+            sys.stdout.write("\n")
         return True
 
     def register_options(self, options):
@@ -153,27 +157,28 @@ class Application:
         group = "Telingo Options"
         options.add(group, "imin", "Minimum number of solving steps [0]", self.__parse_imin, argument="<n>")
         options.add(group, "imax", "Maximum number of solving steps []", self.__parse_imax, argument="<n>")
-        options.add(group, "istop", _textwrap.dedent("""\
+        options.add(group, "istop", dedent("""\
             Stop criterion [sat]
                   <arg>: {sat|unsat|unknown}"""), self.__parse_istop)
 
-    def main(self, prg, files):
+    def main(self, control, files):
         """
         Implements the incremental solving loop.
 
         This function implements the Application.main() function as required by
         clingo.clingo_main().
         """
-        with _ast.ProgramBuilder(prg) as b:
-            files = [open(f) for f in files]
+        with ast.ProgramBuilder(control) as bld:
+            files = [open(path) for path in files]
             if len(files) == 0:
-                files.append(_sys.stdin)
-            future_sigs, program_parts = _tf.transform([f.read() for f in files], b.add)
+                files.append(sys.stdin)
+            future_sigs, program_parts = _tf.transform([path.read() for path in files], bld.add)
 
-        imain(prg, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
+        imain(control, future_sigs, program_parts, self.__on_model, self.__imin, self.__imax, self.__istop)
+
 
 def main():
     """
     Run the telingo application.
     """
-    _sys.exit(int(_clingo.clingo_main(Application(), _sys.argv[1:])))
+    sys.exit(int(clingo_main(TelApp(), sys.argv[1:])))

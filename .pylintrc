@@ -1,0 +1,11 @@
+[FORMAT]
+
+max-line-length=160
+
+[DESIGN]
+
+max-bool-expr=10
+
+max-locals=30
+
+max-args=10
