@@ -81,6 +81,7 @@ ppa:
         - 'README.md'
         - 'LICENSE.md'
     distributions:
+        jammy:
         focal:
         bionic:
             source:
