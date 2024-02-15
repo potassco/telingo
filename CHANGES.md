@@ -1,6 +1,6 @@
 # Changes
 
-## telingo-2.1.2
+## telingo-2.1.3
   * fix tests for clingo 5.7.0
 
 ## telingo-2.1.1
