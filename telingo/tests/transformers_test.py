@@ -161,7 +161,7 @@ class TestProgramTransformer(unittest.TestCase):
 def transform(p):
     r = []
     def append(s):
-        if s.ast_type != ast.ASTType.TheoryDefinition:
+        if s.ast_type != ast.ASTType.TheoryDefinition and s.ast_type != ast.ASTType.Comment:
             r.append(str(s).replace(". [false]", "."))
     f, c = _tfs.transform([p], append)
     return r, f, c
